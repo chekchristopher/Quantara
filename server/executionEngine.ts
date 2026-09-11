@@ -1,0 +1,224 @@
+import { db } from './db';
+import { EnvironmentMode, Order, Position, TradeHistoryItem, TradingSignal } from '../src/types';
+import { RiskValidationResult } from './riskEngine';
+
+export class ExecutionEngine {
+  private processedIdempotencyKeys: Set<string> = new Set();
+
+  /**
+   * Executes an order derived from a validated signal.
+   */
+  public executeSignalTrade(
+    signal: TradingSignal,
+    riskValidation: RiskValidationResult,
+    environment: EnvironmentMode,
+    mode: 'manual' | 'semi-automatic' | 'fully-automatic'
+  ): { success: boolean; position?: Position; order?: Order; message: string } {
+    if (!riskValidation.passed) {
+      return { success: false, message: riskValidation.rejectionReason || 'Risk check failed' };
+    }
+
+    const idempotencyKey = `idemp_${signal.assetSymbol}_${signal.direction}_${Math.floor(signal.timestamp / 10000)}`;
+    if (this.processedIdempotencyKeys.has(idempotencyKey)) {
+      return { success: false, message: 'Duplicate trade prevented by idempotency check' };
+    }
+    this.processedIdempotencyKeys.add(idempotencyKey);
+
+    const isBuy = signal.direction === 'BUY';
+    const side = isBuy ? 'LONG' : 'SHORT';
+    const basePrice = signal.entryPrice;
+    
+    // Simulate realistic execution slippage (0.005% - 0.02%)
+    const slippagePercent = 0.0001 + Math.random() * 0.0002;
+    const fillPrice = isBuy ? basePrice * (1 + slippagePercent) : basePrice * (1 - slippagePercent);
+    const quantity = riskValidation.calculatedQuantity;
+    const sizeUsd = quantity * fillPrice;
+    
+    // Trading fee calculation (0.075% standard taker fee)
+    const feeRate = 0.00075;
+    const feesUsd = Number((sizeUsd * feeRate).toFixed(2));
+
+    // Create Order Record
+    const order: Order = {
+      id: `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      userId: db.user.id,
+      symbol: signal.assetSymbol,
+      type: 'MARKET',
+      side,
+      direction: isBuy ? 'BUY' : 'SELL',
+      quantity,
+      price: basePrice,
+      status: 'FILLED',
+      filledQuantity: quantity,
+      averageFillPrice: Number(fillPrice.toFixed(basePrice > 10 ? 2 : 4)),
+      feesUsd,
+      slippagePercent: Number((slippagePercent * 100).toFixed(4)),
+      createdAt: Date.now(),
+      filledAt: Date.now(),
+      environment,
+      strategyName: signal.strategyName,
+      idempotencyKey,
+    };
+
+    db.orders.unshift(order);
+
+    // Deduct cash and fee from portfolio
+    db.portfolio.cashBalance -= sizeUsd + feesUsd;
+    db.portfolio.currentExposureUsd += sizeUsd;
+    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / db.portfolio.totalEquity) * 100).toFixed(2));
+    db.portfolio.totalTradesExecuted += 1;
+    db.botState.tradesExecutedToday += 1;
+
+    // Create Position
+    const position: Position = {
+      id: `pos_${signal.assetSymbol.replace('/', '_')}_${Date.now()}`,
+      userId: db.user.id,
+      symbol: signal.assetSymbol,
+      side,
+      size: quantity,
+      sizeUsd: Number(sizeUsd.toFixed(2)),
+      entryPrice: Number(fillPrice.toFixed(basePrice > 10 ? 2 : 4)),
+      currentPrice: Number(fillPrice.toFixed(basePrice > 10 ? 2 : 4)),
+      stopLossPrice: riskValidation.stopLossPrice,
+      takeProfitPrice: riskValidation.takeProfitPrice,
+      trailingStopPrice: db.riskSettings.trailingStopEnabled
+        ? Number((fillPrice * (isBuy ? 0.982 : 1.018)).toFixed(basePrice > 10 ? 2 : 4))
+        : undefined,
+      unrealizedPnl: -feesUsd, // start slightly negative due to taker fee
+      unrealizedPnlPercent: Number(((-feesUsd / sizeUsd) * 100).toFixed(2)),
+      realizedPnl: 0,
+      strategyId: signal.strategyId,
+      strategyName: signal.strategyName,
+      openedAt: Date.now(),
+      environment,
+      explanationId: signal.id,
+    };
+
+    db.positions.push(position);
+    db.portfolio.activePositionsCount = db.positions.length;
+
+    db.addAuditLog(
+      'TRADE',
+      `POSITION_OPENED_${side}`,
+      `Opened ${side} ${quantity} ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} via [${signal.strategyName}] in ${environment.toUpperCase()} mode.`,
+      'INFO'
+    );
+
+    db.addNotification(
+      'TRADE_OPEN',
+      `Position Opened: ${signal.assetSymbol}`,
+      `${signal.strategyName} placed ${side} for ${quantity} units at $${fillPrice.toFixed(2)}. SL: $${riskValidation.stopLossPrice}, TP: $${riskValidation.takeProfitPrice}.`,
+      'info'
+    );
+
+    return { success: true, position, order, message: 'Position executed and verified successfully' };
+  }
+
+  /**
+   * Closes a position by ID with given exit reason.
+   */
+  public closePosition(
+    positionId: string,
+    currentPrice: number,
+    exitReason: TradeHistoryItem['exitReason'],
+    environment: EnvironmentMode
+  ): { success: boolean; closedTrade?: TradeHistoryItem; message: string } {
+    const posIndex = db.positions.findIndex((p) => p.id === positionId);
+    if (posIndex === -1) {
+      return { success: false, message: 'Position not found' };
+    }
+
+    const pos = db.positions[posIndex];
+    const isLong = pos.side === 'LONG';
+    const rawPnl = isLong ? (currentPrice - pos.entryPrice) * pos.size : (pos.entryPrice - currentPrice) * pos.size;
+    const fee = Number((pos.size * currentPrice * 0.00075).toFixed(2));
+    const finalRealizedPnl = Number((rawPnl - fee).toFixed(2));
+    const pnlPercent = Number(((finalRealizedPnl / pos.sizeUsd) * 100).toFixed(2));
+
+    // Update portfolio balances
+    db.portfolio.cashBalance += pos.sizeUsd + finalRealizedPnl;
+    db.portfolio.realizedPnlToday += finalRealizedPnl;
+    db.portfolio.totalRealizedPnl += finalRealizedPnl;
+    db.portfolio.totalEquity += finalRealizedPnl;
+    db.portfolio.currentExposureUsd = Math.max(0, db.portfolio.currentExposureUsd - pos.sizeUsd);
+    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / db.portfolio.totalEquity) * 100).toFixed(2));
+
+    // Recalculate win rate & profit factor
+    const allClosed = [...db.tradesHistory];
+    const wins = allClosed.filter((t) => t.realizedPnl > 0).length + (finalRealizedPnl > 0 ? 1 : 0);
+    const totalCount = allClosed.length + 1;
+    db.portfolio.winRatePercent = Number(((wins / totalCount) * 100).toFixed(1));
+
+    // Peak equity & drawdown tracking
+    if (db.portfolio.totalEquity > db.portfolio.peakEquity) {
+      db.portfolio.peakEquity = db.portfolio.totalEquity;
+    }
+    const currentDrawdown = ((db.portfolio.peakEquity - db.portfolio.totalEquity) / db.portfolio.peakEquity) * 100;
+    db.portfolio.currentDrawdownPercent = Number(Math.max(0, currentDrawdown).toFixed(2));
+    db.portfolio.maxDrawdownPercent = Number(Math.max(db.portfolio.maxDrawdownPercent, db.portfolio.currentDrawdownPercent).toFixed(2));
+    db.portfolio.todayPnlPercent = Number(((db.portfolio.realizedPnlToday / db.portfolio.totalEquity) * 100).toFixed(2));
+
+    const closedItem: TradeHistoryItem = {
+      id: `trd_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      symbol: pos.symbol,
+      side: pos.side,
+      entryPrice: pos.entryPrice,
+      exitPrice: currentPrice,
+      quantity: pos.size,
+      realizedPnl: finalRealizedPnl,
+      realizedPnlPercent: pnlPercent,
+      feesPaid: fee,
+      strategyName: pos.strategyName,
+      entryTime: pos.openedAt,
+      exitTime: Date.now(),
+      exitReason,
+      environment,
+      tradeExplanation: `Closed ${pos.side} on ${pos.symbol} at $${currentPrice.toFixed(2)} (${exitReason}) with P&L: ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%).`,
+    };
+
+    db.tradesHistory.unshift(closedItem);
+    db.positions.splice(posIndex, 1);
+    db.portfolio.activePositionsCount = db.positions.length;
+
+    const notifType = exitReason === 'TAKE_PROFIT' ? 'TAKE_PROFIT' : exitReason === 'STOP_LOSS' ? 'STOP_LOSS' : 'TRADE_CLOSE';
+    const severity = finalRealizedPnl >= 0 ? 'success' : 'warning';
+
+    db.addNotification(
+      notifType,
+      `${exitReason} Triggered: ${pos.symbol}`,
+      `Closed ${pos.side} @ $${currentPrice.toFixed(2)}. Net P&L: ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%).`,
+      severity
+    );
+
+    db.addAuditLog(
+      'TRADE',
+      `POSITION_CLOSED_${exitReason}`,
+      `Closed position on ${pos.symbol} for ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%) via ${exitReason}.`,
+      severity === 'success' ? 'INFO' : 'WARN'
+    );
+
+    return { success: true, closedTrade: closedItem, message: `Position closed via ${exitReason}` };
+  }
+
+  /**
+   * Emergency close all open positions.
+   */
+  public emergencyCloseAllPositions(environment: EnvironmentMode): { closedCount: number; message: string } {
+    const count = db.positions.length;
+    while (db.positions.length > 0) {
+      const pos = db.positions[0];
+      this.closePosition(pos.id, pos.currentPrice, 'KILL_SWITCH', environment);
+    }
+
+    db.addAuditLog(
+      'KILL_SWITCH',
+      'EMERGENCY_CLOSE_ALL_EXECUTED',
+      `Emergency closed ${count} active positions immediately upon Kill Switch trigger.`,
+      'CRITICAL'
+    );
+
+    return { closedCount: count, message: `Successfully liquidated ${count} open positions.` };
+  }
+}
+
+export const executionEngine = new ExecutionEngine();
