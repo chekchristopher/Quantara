@@ -57,6 +57,43 @@ export const api = {
     return res.json();
   },
 
+  async toggleTakeover(takeover: boolean, accountId?: string): Promise<{ success: boolean; botState: BotState }> {
+    const res = await fetch('/api/bot/takeover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ takeover, accountId }),
+    });
+    return res.json();
+  },
+
+  async setCompoundingMode(payload: {
+    mode: 'standard' | 'micro-wealth-accelerator';
+    target?: number;
+    asymmetricFilter?: boolean;
+    initialCapital?: number;
+  }): Promise<{ success: boolean; botState: BotState }> {
+    const res = await fetch('/api/bot/compounding-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async resetCapital(amount: number, isChallenge?: boolean): Promise<{ success: boolean; portfolio: PortfolioSummary; botState: BotState }> {
+    const res = await fetch('/api/portfolio/reset-capital', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, isChallenge }),
+    });
+    return res.json();
+  },
+
+  async getCompoundingRoadmap(): Promise<any> {
+    const res = await fetch('/api/compounding/roadmap');
+    return res.json();
+  },
+
   async setStrategy(strategyId: string): Promise<{ success: boolean; botState: BotState }> {
     const res = await fetch('/api/bot/strategy', {
       method: 'POST',
@@ -112,6 +149,28 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(order),
     });
+    return res.json();
+  },
+
+  // Market Data & Real-Time Live Feed
+  async getMarketAssets(): Promise<MarketAsset[]> {
+    const res = await fetch('/api/market/assets');
+    return res.json();
+  },
+
+  async getMarketStatus(): Promise<{
+    liveStatus: string;
+    lastSyncTime: number;
+    assetsCount: number;
+    forexCount: number;
+    cryptoCount: number;
+  }> {
+    const res = await fetch('/api/market/status');
+    return res.json();
+  },
+
+  async syncLiveMarketRates(): Promise<{ success: boolean; message: string; lastSyncTime: number }> {
+    const res = await fetch('/api/market/sync-live', { method: 'POST' });
     return res.json();
   },
 
@@ -174,8 +233,67 @@ export const api = {
     return res.json();
   },
 
-  // Brokers
-  async connectBroker(payload: { broker: string; apiKey: string; isPaper: boolean; simulatedBalance?: number }): Promise<any> {
+  // Brokers & MT5
+  async getBrokerAccounts(): Promise<BrokerAccount[]> {
+    const res = await fetch('/api/brokers');
+    return res.json();
+  },
+
+  async loginMT5Broker(payload: {
+    server: string;
+    login: string;
+    password?: string;
+    accountType?: 'REAL' | 'DEMO';
+    brokerName?: string;
+    accountName?: string;
+    customName?: string;
+    leverage?: string;
+    currency?: string;
+    balance?: number;
+    autoTradeControl?: any;
+  }): Promise<{ success: boolean; account: BrokerAccount; pingMs: number; message: string }> {
+    const res = await fetch('/api/brokers/mt5/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async renameBrokerAccount(id: string, name: string): Promise<{ success: boolean; account: BrokerAccount; message?: string }> {
+    const res = await fetch(`/api/brokers/${id}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    return res.json();
+  },
+
+  async updateMT5Control(payload: { accountId?: string; autoTradeControl: any }): Promise<any> {
+    const res = await fetch('/api/brokers/mt5/update-control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async closeAllMT5Positions(): Promise<any> {
+    const res = await fetch('/api/brokers/mt5/close-all', { method: 'POST' });
+    return res.json();
+  },
+
+  async connectBroker(payload: {
+    broker: string;
+    apiKey: string;
+    isPaper: boolean;
+    simulatedBalance?: number;
+    server?: string;
+    accountNumber?: string;
+    leverage?: string;
+    accountName?: string;
+    customName?: string;
+  }): Promise<any> {
     const res = await fetch('/api/brokers/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -186,6 +304,15 @@ export const api = {
 
   async disconnectBroker(id: string): Promise<any> {
     const res = await fetch(`/api/brokers/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+
+  async selectActiveBroker(accountId: string): Promise<{ success: boolean; activeAccount: BrokerAccount; botState: BotState }> {
+    const res = await fetch('/api/brokers/select-active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId }),
+    });
     return res.json();
   },
 

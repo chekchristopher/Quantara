@@ -203,12 +203,12 @@ export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, on
       {result && (
         <div className="space-y-6">
           {/* Institutional Metric Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 font-mono">
             {/* Net Return */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Net Profit / Return</span>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Net Profit / Return</span>
               <div
-                className={`text-lg font-bold mt-1 ${
+                className={`text-base sm:text-lg font-bold mt-1 truncate ${
                   result.netProfit >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'
                 }`}
               >
@@ -218,39 +218,39 @@ export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, on
             </div>
 
             {/* Win Rate */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Win Rate (Wins/Loss)</span>
-              <div className="text-lg font-bold text-white mt-1">{result.winRate}%</div>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Win Rate (Wins/Loss)</span>
+              <div className="text-base sm:text-lg font-bold text-white mt-1 truncate">{result.winRate}%</div>
               <span className="text-[10px] text-[#8E9299]">
-                {result.winningTrades}W / {result.losingTrades}L ({result.totalTrades} total)
+                {result.winningTrades}W / {result.losingTrades}L
               </span>
             </div>
 
             {/* Profit Factor */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Profit Factor</span>
-              <div className="text-lg font-bold text-indigo-400 mt-1">{result.profitFactor}x</div>
-              <span className="text-[10px] text-[#8E9299]">Gross Win / Gross Loss</span>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Profit Factor</span>
+              <div className="text-base sm:text-lg font-bold text-indigo-400 mt-1 truncate">{result.profitFactor}x</div>
+              <span className="text-[10px] text-[#8E9299]">Gross Win / Loss</span>
             </div>
 
             {/* Sharpe Ratio */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Sharpe Ratio</span>
-              <div className="text-lg font-bold text-blue-400 mt-1">{result.sharpeRatio}</div>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Sharpe Ratio</span>
+              <div className="text-base sm:text-lg font-bold text-blue-400 mt-1 truncate">{result.sharpeRatio}</div>
               <span className="text-[10px] text-[#8E9299]">Sortino: {result.sortinoRatio}</span>
             </div>
 
             {/* Max Drawdown */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Max Drawdown</span>
-              <div className="text-lg font-bold text-yellow-400 mt-1">-{result.maxDrawdownPercent}%</div>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Max Drawdown</span>
+              <div className="text-base sm:text-lg font-bold text-yellow-400 mt-1 truncate">-{result.maxDrawdownPercent}%</div>
               <span className="text-[10px] text-[#8E9299]">-${result.maxDrawdownUsd.toLocaleString()}</span>
             </div>
 
             {/* Consecutive Losses */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-4">
-              <span className="text-[10px] uppercase tracking-wider text-[#8E9299]">Max Loss Streak</span>
-              <div className="text-lg font-bold text-white mt-1">{result.maxConsecutiveLosses}</div>
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#8E9299]">Max Loss Streak</span>
+              <div className="text-base sm:text-lg font-bold text-white mt-1 truncate">{result.maxConsecutiveLosses}</div>
               <span className="text-[10px] text-[#8E9299]">Avg Win: ${result.avgWinUsd}</span>
             </div>
           </div>

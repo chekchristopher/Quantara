@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
+import { WorkbookView } from './components/WorkbookView';
 import { TradingEngineView } from './components/TradingEngineView';
 import { BacktestingView } from './components/BacktestingView';
 import { StrategyLibraryView } from './components/StrategyLibraryView';
 import { RiskManagementView } from './components/RiskManagementView';
 import { AccountBrokerView } from './components/AccountBrokerView';
+import { MicroAccountCompoundingView } from './components/MicroAccountCompoundingView';
 import { SystemTestingView } from './components/SystemTestingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { TradeExplanationModal } from './components/TradeExplanationModal';
 import { LiveTradingConfirmationModal } from './components/LiveTradingConfirmationModal';
+import { QuantaraLogoMark } from './components/QuantaraLogo';
 import { api, SnapshotData } from './services/api';
 import {
   AuditLog,
@@ -32,36 +35,39 @@ export default function App() {
 
   // Core Application State
   const [botState, setBotState] = useState<BotState>({
-    isRunning: true,
-    status: 'ONLINE',
-    mode: 'semi-automatic',
+    isRunning: false,
+    status: 'AWAITING_BROKER_CONNECTION',
+    mode: 'fully-automatic',
     environment: 'paper',
     activeStrategyId: 'adaptive-regime',
     activeStrategyName: 'Adaptive Regime Meta-Engine',
-    selectedAssets: ['BTC/USD', 'ETH/USD', 'SOL/USD', 'NVDA', 'AAPL'],
-    tradesExecutedToday: 4,
+    selectedAssets: ['XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD'],
+    tradesExecutedToday: 0,
     lastTickTimestamp: Date.now(),
-    currentRegime: 'Strong Bullish Trend',
+    currentRegime: 'Market Feeds Active',
     activeRiskLevel: 'SAFE',
+    autonomousTakeover: false,
+    activeBrokerAccountId: undefined,
+    activeBrokerAccountName: undefined,
   });
 
   const [portfolio, setPortfolio] = useState<PortfolioSummary>({
-    totalEquity: 54320.5,
-    cashBalance: 41850.2,
-    unrealizedPnl: 1120.3,
-    realizedPnlToday: 430.0,
-    totalRealizedPnl: 4320.5,
-    todayPnlPercent: 1.45,
-    totalReturnPercent: 8.64,
-    maxDrawdownPercent: 3.8,
-    currentDrawdownPercent: 1.2,
-    winRatePercent: 68.4,
-    profitFactor: 2.34,
-    totalTradesExecuted: 48,
-    activePositionsCount: 2,
-    currentExposureUsd: 11350.0,
-    currentExposurePercent: 20.9,
-    peakEquity: 54950.0,
+    totalEquity: 0.0,
+    cashBalance: 0.0,
+    unrealizedPnl: 0.0,
+    realizedPnlToday: 0.0,
+    totalRealizedPnl: 0.0,
+    todayPnlPercent: 0.0,
+    totalReturnPercent: 0.0,
+    maxDrawdownPercent: 0.0,
+    currentDrawdownPercent: 0.0,
+    winRatePercent: 0.0,
+    profitFactor: 0.0,
+    totalTradesExecuted: 0,
+    activePositionsCount: 0,
+    currentExposureUsd: 0.0,
+    currentExposurePercent: 0.0,
+    peakEquity: 0.0,
   });
 
   const [positions, setPositions] = useState<Position[]>([]);
@@ -96,9 +102,15 @@ export default function App() {
 
   // Subscribe to Realtime Server-Sent Events (SSE)
   useEffect(() => {
-    // Load initial strategy metadata
+    // Load initial strategy metadata and live market assets immediately
     api.getStrategies().then(setStrategies).catch(console.warn);
     api.getAuditLogs().then(setAuditLogs).catch(console.warn);
+    api.getMarketAssets().then(setAssets).catch(console.warn);
+
+    // Reliable fallback poll every 2.5s for live price freshness
+    const pollInterval = setInterval(() => {
+      api.getMarketAssets().then(setAssets).catch(() => {});
+    }, 2500);
 
     let eventSource: EventSource | null = null;
 
@@ -132,6 +144,7 @@ export default function App() {
     connectSSE();
 
     return () => {
+      clearInterval(pollInterval);
       if (eventSource) eventSource.close();
     };
   }, []);
@@ -207,8 +220,39 @@ export default function App() {
     return api.connectBroker(payload);
   };
 
+  const handleLoginMT5Broker = async (payload: any) => {
+    const res = await api.loginMT5Broker(payload);
+    const brokers = await api.getBrokerAccounts();
+    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    const assetsData = await api.getMarketAssets();
+    if (Array.isArray(assetsData)) setAssets(assetsData);
+    return res;
+  };
+
+  const handleUpdateMT5Control = async (payload: any) => {
+    const res = await api.updateMT5Control(payload);
+    const brokers = await api.getBrokerAccounts();
+    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    return res;
+  };
+
+  const handleCloseAllMT5 = async () => {
+    const res = await api.closeAllMT5Positions();
+    const snap = await api.getBrokerAccounts();
+    if (Array.isArray(snap)) setBrokerAccounts(snap);
+    setPositions([]);
+    return res;
+  };
+
   const handleDisconnectBroker = async (id: string) => {
     return api.disconnectBroker(id);
+  };
+
+  const handleRenameBroker = async (id: string, name: string) => {
+    const res = await api.renameBrokerAccount(id, name);
+    const brokers = await api.getBrokerAccounts();
+    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    return res;
   };
 
   const handleRunTests = async () => {
@@ -227,6 +271,35 @@ export default function App() {
     await api.markNotificationsRead();
   };
 
+  const handleToggleTakeover = async () => {
+    const nextVal = !botState.autonomousTakeover;
+    const res = await api.toggleTakeover(nextVal);
+    if (res?.botState) {
+      setBotState(res.botState);
+    }
+  };
+
+  const handleResetCapital = async (amount: number, isChallenge?: boolean) => {
+    const res = await api.resetCapital(amount, isChallenge);
+    if (res?.portfolio) setPortfolio(res.portfolio);
+    if (res?.botState) setBotState(res.botState);
+    // Refresh broker accounts
+    const brokers = await api.getBrokerAccounts();
+    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+  };
+
+  const handleUpdateCompounding = async (payload: { mode: 'standard' | 'micro-wealth-accelerator'; target?: number; asymmetricFilter?: boolean }) => {
+    const res = await api.setCompoundingMode(payload);
+    if (res?.botState) setBotState(res.botState);
+  };
+
+  const handleSelectActiveBroker = async (accountId: string) => {
+    const res = await api.selectActiveBroker(accountId);
+    if (res?.botState) setBotState(res.botState);
+    const brokers = await api.getBrokerAccounts();
+    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+  };
+
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-[#E4E4E7] flex flex-col antialiased selection:bg-blue-600/30 selection:text-blue-300">
       {/* Top Navbar */}
@@ -237,6 +310,7 @@ export default function App() {
         riskSettings={riskSettings}
         notifications={notifications}
         onToggleBot={handleToggleBot}
+        onToggleTakeover={handleToggleTakeover}
         onTriggerKillSwitch={handleTriggerKillSwitch}
         onRequestLiveMode={handleRequestLiveMode}
         onSwitchToPaper={handleSwitchToPaper}
@@ -244,7 +318,7 @@ export default function App() {
       />
 
       {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-24 md:pb-8 space-y-6">
         {currentTab === 'dashboard' && (
           <DashboardView
             portfolio={portfolio}
@@ -254,12 +328,32 @@ export default function App() {
             tradesHistory={tradesHistory}
             assets={assets}
             riskSettings={riskSettings}
+            brokerAccounts={brokerAccounts}
             onClosePosition={handleClosePosition}
             onEmergencyCloseAll={handleEmergencyCloseAll}
             onSetTradingMode={handleSetTradingMode}
             onPlaceManualOrder={handlePlaceManualOrder}
             onOpenExplanationModal={(id, data) => setExplanationTarget({ id, data })}
             onNavigateTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'workbook' && (
+          <WorkbookView onNavigateTab={setCurrentTab} />
+        )}
+
+        {currentTab === 'compounding' && (
+          <MicroAccountCompoundingView
+            portfolio={portfolio}
+            botState={botState}
+            brokerAccounts={brokerAccounts}
+            recentTrades={tradesHistory}
+            openPositions={positions}
+            onResetCapital={handleResetCapital}
+            onToggleTakeover={handleToggleTakeover}
+            onUpdateCompounding={handleUpdateCompounding}
+            onSelectBrokerForTakeover={handleSelectActiveBroker}
+            onNavigateToTab={setCurrentTab}
           />
         )}
 
@@ -304,8 +398,22 @@ export default function App() {
         {currentTab === 'brokers' && (
           <AccountBrokerView
             brokerAccounts={brokerAccounts}
+            activeBrokerAccountId={botState.activeBrokerAccountId}
+            autonomousTakeover={botState.autonomousTakeover}
+            positions={positions}
+            orders={orders}
+            portfolio={portfolio}
+            assets={assets}
+            onLoginMT5={handleLoginMT5Broker}
+            onUpdateMT5Control={handleUpdateMT5Control}
+            onCloseAllMT5={handleCloseAllMT5}
+            onPlaceManualOrder={handlePlaceManualOrder}
+            onClosePosition={handleClosePosition}
             onConnectBroker={handleConnectBroker}
             onDisconnectBroker={handleDisconnectBroker}
+            onSelectActiveBroker={handleSelectActiveBroker}
+            onRenameBroker={handleRenameBroker}
+            onToggleTakeover={handleToggleTakeover}
           />
         )}
 
@@ -352,9 +460,10 @@ export default function App() {
             <span>MODE: {botState.mode.toUpperCase()} ({botState.environment.toUpperCase()})</span>
           </div>
           <div className="flex items-center space-x-2 text-[11px] text-[#8E9299]">
-            <span className="text-white font-semibold">Quantara</span>
-            <span>—</span>
-            <span>Intelligent Trading. Automated Execution.</span>
+            <QuantaraLogoMark size="sm" showGlow={false} className="w-5 h-5 mr-0.5" />
+            <span className="font-brand text-xs font-bold tracking-[0.16em] text-white">QUANT<span className="text-blue-400">ARA</span></span>
+            <span className="text-[#2E2E33]">—</span>
+            <span className="font-tech text-xs tracking-wide">Intelligent Trading. Automated Execution.</span>
           </div>
         </div>
       </footer>

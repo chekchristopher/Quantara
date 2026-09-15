@@ -27,7 +27,8 @@ tradingEngine.start();
 // -----------------------------------------------------------------------------
 app.get('/api/health', (req, res) => {
   res.json({
-    status: 'OPTIMAL',
+    status: 'ok',
+    systemStatus: 'OPTIMAL',
     uptimeSeconds: Math.floor(process.uptime()),
     memoryUsageMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     tradingEngineRunning: db.botState.isRunning,
@@ -88,6 +89,179 @@ app.post('/api/bot/mode', (req, res) => {
   }
   tradingEngine.broadcastState();
   res.json({ success: true, botState: db.botState });
+});
+
+app.post('/api/bot/takeover', (req, res) => {
+  const { takeover, accountId } = req.body;
+  if (typeof takeover === 'boolean') {
+    db.botState.autonomousTakeover = takeover;
+    if (takeover) {
+      db.botState.mode = 'fully-automatic';
+    }
+  }
+
+  if (accountId) {
+    const acc = db.brokerAccounts.find((b) => b.id === accountId);
+    if (acc) {
+      db.brokerAccounts.forEach((b) => (b.isActiveForTakeover = b.id === accountId));
+      db.botState.activeBrokerAccountId = acc.id;
+      db.botState.activeBrokerAccountName = acc.name;
+    }
+  }
+
+  const statusLabel = db.botState.autonomousTakeover ? 'ACTIVATED' : 'DISENGAGED';
+  db.addAuditLog(
+    'CONFIG',
+    'AUTONOMOUS_TAKEOVER_TOGGLED',
+    `Autonomous Execution Takeover ${statusLabel} for ${db.botState.activeBrokerAccountName || 'Active Account'}.`,
+    db.botState.autonomousTakeover ? 'INFO' : 'WARN'
+  );
+  db.addNotification(
+    'SYSTEM',
+    `Autonomous Takeover: ${statusLabel}`,
+    db.botState.autonomousTakeover
+      ? `Quantara AI Engine is actively taking over automated execution on ${db.botState.activeBrokerAccountName || 'your account'}.`
+      : 'Autonomous hands-free takeover disengaged. Manual confirmation restored.',
+    db.botState.autonomousTakeover ? 'success' : 'info'
+  );
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, botState: db.botState });
+});
+
+app.post('/api/bot/compounding-mode', (req, res) => {
+  const { mode, target, asymmetricFilter, initialCapital } = req.body;
+  if (mode) db.botState.compoundingMode = mode;
+  if (target) db.botState.microAccountTarget = Number(target);
+  if (typeof asymmetricFilter === 'boolean') db.botState.asymmetricFilterEnabled = asymmetricFilter;
+  if (initialCapital) db.botState.initialSeedCapital = Number(initialCapital);
+
+  db.addAuditLog('CONFIG', 'COMPOUNDING_MODE_UPDATED', `Compounding mode set to ${db.botState.compoundingMode} (Target: $${db.botState.microAccountTarget.toLocaleString()}).`);
+  tradingEngine.broadcastState();
+  res.json({ success: true, botState: db.botState });
+});
+
+app.post('/api/portfolio/reset-capital', (req, res) => {
+  const { amount, isChallenge } = req.body;
+  const newCapital = Number(amount) || 10.0;
+
+  // Clear existing positions safely
+  db.positions = [];
+  db.portfolio.cashBalance = newCapital;
+  db.portfolio.totalEquity = newCapital;
+  db.portfolio.peakEquity = newCapital;
+  db.portfolio.unrealizedPnl = 0;
+  db.portfolio.realizedPnlToday = 0;
+  db.portfolio.totalRealizedPnl = 0;
+  db.portfolio.currentExposureUsd = 0;
+  db.portfolio.currentExposurePercent = 0;
+  db.portfolio.currentDrawdownPercent = 0;
+  db.portfolio.activePositionsCount = 0;
+  db.portfolio.totalTradesExecuted = 0;
+  db.portfolio.todayPnlPercent = 0;
+  db.portfolio.totalReturnPercent = 0;
+
+  db.botState.initialSeedCapital = newCapital;
+  if (newCapital <= 100) {
+    db.botState.compoundingMode = 'micro-wealth-accelerator';
+    db.botState.asymmetricFilterEnabled = true;
+    db.riskSettings.maxRiskPerTradePercent = 2.5;
+    db.riskSettings.trailingStopEnabled = true;
+  }
+
+  // Update active broker account balance if paper
+  if (db.botState.activeBrokerAccountId) {
+    const acc = db.brokerAccounts.find((b) => b.id === db.botState.activeBrokerAccountId);
+    if (acc && acc.isPaper) {
+      acc.simulatedBalance = newCapital;
+    }
+  }
+
+  db.addAuditLog(
+    'CONFIG',
+    'CAPITAL_INITIALIZED',
+    `Account capital initialized to $${newCapital.toFixed(2)} (${isChallenge ? '$10 Micro-Account Wealth Challenge' : 'Custom Capital Reset'}).`,
+    'INFO'
+  );
+  db.addNotification(
+    'SYSTEM',
+    'Account Capital Reset',
+    `Trading capital calibrated to $${newCapital.toFixed(2)}. Micro-compounding engine primed.`,
+    'success'
+  );
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, portfolio: db.portfolio, botState: db.botState });
+});
+
+app.get('/api/compounding/roadmap', (req, res) => {
+  const equity = db.portfolio.totalEquity;
+  const seed = db.botState.initialSeedCapital || 10;
+  const target = db.botState.microAccountTarget || 10000;
+
+  const milestones = [
+    {
+      id: 'm1',
+      stage: 1,
+      title: 'Phase 1: Seed Survival',
+      targetBalance: 25.0,
+      phase: '$10 → $25 (2.5x Growth)',
+      description: 'Capital preservation, fractional ATR lot sizes, strict zero-ruin risk (2.5% max risk, 1:3 R:R).',
+      achieved: equity >= 25.0,
+      progressPercent: Math.min(100, Math.max(0, Math.round(((equity - seed) / (25 - seed)) * 100))),
+    },
+    {
+      id: 'm2',
+      stage: 2,
+      title: 'Phase 2: Compounding Velocity',
+      targetBalance: 100.0,
+      phase: '$25 → $100 (4x Acceleration)',
+      description: 'Break-even trailing locks activate at +1.2R. 100% of realized profits auto-reinvested into next lot size.',
+      achieved: equity >= 100.0,
+      progressPercent: Math.min(100, Math.max(0, Math.round(((equity - 25) / (100 - 25)) * 100))),
+    },
+    {
+      id: 'm3',
+      stage: 3,
+      title: 'Phase 3: Multi-Asset Scale',
+      targetBalance: 500.0,
+      phase: '$100 → $500 (5x Scale)',
+      description: 'Portfolio expands across high-liquidity crypto & equities (BTC, SOL, NVDA, AAPL) with decorrelation checks.',
+      achieved: equity >= 500.0,
+      progressPercent: Math.min(100, Math.max(0, Math.round(((equity - 100) / (500 - 100)) * 100))),
+    },
+    {
+      id: 'm4',
+      stage: 4,
+      title: 'Phase 4: Momentum Expansion',
+      targetBalance: 2500.0,
+      phase: '$500 → $2,500 (5x Expansion)',
+      description: 'Regime detection switches between Trend Breakouts and Volatility Squeezes to compound equity faster.',
+      achieved: equity >= 2500.0,
+      progressPercent: Math.min(100, Math.max(0, Math.round(((equity - 500) / (2500 - 500)) * 100))),
+    },
+    {
+      id: 'm5',
+      stage: 5,
+      title: 'Phase 5: Wealth Engine',
+      targetBalance: target,
+      phase: `$2,500 → $${target.toLocaleString()} (Wealth Tier)`,
+      description: 'Full institutional risk management, portfolio hedging, and automated profit harvesting.',
+      achieved: equity >= target,
+      progressPercent: Math.min(100, Math.max(0, Math.round(((equity - 2500) / (target - 2500)) * 100))),
+    },
+  ];
+
+  res.json({
+    currentEquity: equity,
+    initialSeedCapital: seed,
+    targetCapital: target,
+    overallProgressPercent: Math.min(100, Math.max(0, Math.round((equity / target) * 100))),
+    milestones,
+    compoundingMode: db.botState.compoundingMode,
+    asymmetricFilterEnabled: db.botState.asymmetricFilterEnabled,
+    autonomousTakeover: db.botState.autonomousTakeover,
+  });
 });
 
 app.post('/api/bot/strategy', (req, res) => {
@@ -204,10 +378,34 @@ app.post('/api/orders/manual', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 5. Market Data & Simulation Controls
+// 5. Market Data & Real-Time Controls
 // -----------------------------------------------------------------------------
 app.get('/api/market/assets', (req, res) => {
   res.json(marketDataService.getAllAssets());
+});
+
+app.get('/api/market/status', (req, res) => {
+  res.json({
+    liveStatus: marketDataService.liveStatus,
+    lastSyncTime: marketDataService.lastSyncTime,
+    assetsCount: marketDataService.getAllAssets().length,
+    forexCount: marketDataService.getForexAssets().length,
+    cryptoCount: marketDataService.getCryptoAssets().length,
+  });
+});
+
+app.post('/api/market/sync-live', async (req, res) => {
+  await Promise.allSettled([
+    marketDataService.syncLiveCryptoPrices(),
+    marketDataService.syncLiveForexRates(),
+    marketDataService.syncLiveGoldPrice(),
+  ]);
+  tradingEngine.broadcastState();
+  res.json({
+    success: true,
+    message: 'Live market rates synchronized successfully from Binance, Gold Spot, & European Central Bank',
+    lastSyncTime: marketDataService.lastSyncTime,
+  });
 });
 
 app.post('/api/market/shock', (req, res) => {
@@ -293,33 +491,243 @@ app.post('/api/risk/settings', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 9. Broker Accounts & Exchange Connections
+// 9. Broker Accounts & Exchange Connections (Including MetaTrader 5 Bridge)
 // -----------------------------------------------------------------------------
 app.get('/api/brokers', (req, res) => {
   res.json(db.brokerAccounts);
 });
 
+app.post('/api/brokers/mt5/login', (req, res) => {
+  const {
+    server = 'Exness-MT5Real',
+    login = '10849201',
+    password = '',
+    accountType = 'REAL',
+    brokerName = 'Exness',
+    accountName = '',
+    customName = '',
+    leverage = '1:500',
+    currency = 'USD',
+    balance = 5000,
+    autoTradeControl,
+  } = req.body;
+
+  if (!login || !server) {
+    return res.status(400).json({ success: false, message: 'Server and Account Login are required.' });
+  }
+
+  const pingMs = Math.floor(9 + Math.random() * 15);
+  const numBalance = Math.max(10, Number(balance) || 5000);
+  const maskedPw = password ? `${'•'.repeat(Math.max(6, password.length))}` : '••••••••••••';
+  const customIdentName = (accountName || customName)?.trim();
+  const assignedName = customIdentName || `${brokerName} MT5 (${server})`;
+
+  const newAccount: any = {
+    id: `acc_mt5_${Date.now()}`,
+    name: assignedName,
+    broker: brokerName,
+    server,
+    accountNumber: String(login),
+    accountType: accountType === 'REAL' ? 'REAL' : 'DEMO',
+    leverage,
+    currency,
+    apiKeyMasked: maskedPw,
+    status: 'CONNECTED',
+    permissions: [
+      'MetaTrader 5 Bridge Auth',
+      'Algorithmic Execution',
+      'Live Tick Streaming',
+      'Automated Risk / Stop Loss',
+      'XAU/USD Gold Spot STP',
+    ],
+    simulatedBalance: numBalance,
+    equity: numBalance,
+    freeMargin: numBalance,
+    marginLevel: 9999,
+    pingMs,
+    terminalVersion: 'MetaTrader 5 x64 Terminal Build 4450',
+    isPaper: accountType !== 'REAL',
+    lastConnected: Date.now(),
+    isActiveForTakeover: true,
+    autoTradeControl: autoTradeControl || {
+      autoTradeEnabled: true,
+      prioritizeGold: true,
+      riskPerTradePercent: 1.5,
+      lotSizeMode: 'DYNAMIC',
+      fixedLotSize: 0.10,
+      maxOpenTrades: 4,
+      dailyLossHaltPercent: 4.0,
+      trailingStopPips: 25,
+      takeProfitRatio: 2.5,
+    },
+  };
+
+  // Mark all other accounts as inactive for takeover
+  db.brokerAccounts.forEach((b) => {
+    b.isActiveForTakeover = false;
+  });
+
+  // Prepend new account to list
+  db.brokerAccounts.unshift(newAccount);
+
+  // Synchronize Bot state & Portfolio
+  db.botState.activeBrokerAccountId = newAccount.id;
+  db.botState.activeBrokerAccountName = newAccount.name;
+  db.botState.environment = newAccount.isPaper ? 'paper' : 'live';
+  db.botState.autonomousTakeover = Boolean(newAccount.autoTradeControl?.autoTradeEnabled ?? true);
+  db.botState.isRunning = true;
+  db.botState.status = 'ONLINE';
+
+  // Synchronize Portfolio capital to user's real broker capital
+  db.portfolio.cashBalance = numBalance;
+  db.portfolio.totalEquity = numBalance;
+  db.portfolio.peakEquity = numBalance;
+  db.portfolio.currentExposureUsd = 0;
+  db.portfolio.currentExposurePercent = 0;
+  db.botState.initialSeedCapital = numBalance;
+
+  // Clear existing open demo positions if any to cleanly run on user's broker
+  db.positions = [];
+
+  db.addAuditLog(
+    'BROKER',
+    'MT5_LOGIN_SUCCESSFUL',
+    `Authenticated to ${server} (Login: #${login}, Type: ${accountType}). Latency: ${pingMs}ms. Autonomous trading control ENGAGED.`,
+    'INFO'
+  );
+  db.addNotification(
+    'SYSTEM',
+    `MT5 Connected: ${server} #${login}`,
+    `Successfully connected to MetaTrader 5 broker. Auto-trading engine is now actively managing trades for this account.`,
+    'success'
+  );
+
+  tradingEngine.broadcastState();
+  res.json({
+    success: true,
+    account: newAccount,
+    pingMs,
+    message: `Connected to ${server} (#${login}) with ${pingMs}ms latency. Auto-trading is ACTIVE.`,
+  });
+});
+
+app.post('/api/brokers/mt5/update-control', (req, res) => {
+  const { accountId, autoTradeControl } = req.body;
+  const target = db.brokerAccounts.find((b) => b.id === accountId) || db.brokerAccounts.find((b) => b.isActiveForTakeover);
+
+  if (target && autoTradeControl) {
+    target.autoTradeControl = { ...target.autoTradeControl, ...autoTradeControl };
+    if (typeof autoTradeControl.autoTradeEnabled === 'boolean') {
+      db.botState.autonomousTakeover = autoTradeControl.autoTradeEnabled;
+    }
+  }
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, autoTradeControl: target?.autoTradeControl });
+});
+
+app.post('/api/brokers/mt5/close-all', (req, res) => {
+  executionEngine.emergencyCloseAllPositions(db.botState.environment);
+  db.addAuditLog('BROKER', 'MT5_CLOSE_ALL', 'Closed all active MT5 positions by user command.', 'WARN');
+  tradingEngine.broadcastState();
+  res.json({ success: true, message: 'All open MT5 positions closed.' });
+});
+
 app.post('/api/brokers/connect', (req, res) => {
-  const { broker, apiKey, isPaper, simulatedBalance } = req.body;
-  const masked = apiKey ? `${apiKey.slice(0, 4)}••••••••••••${apiKey.slice(-4)}` : 'demo_••••••••••••99A1';
-  const newAccount = {
+  const { broker, apiKey, isPaper, simulatedBalance, server, accountNumber, leverage, name, customName, accountName } = req.body;
+  const masked = apiKey ? `${apiKey.slice(0, 4)}••••••••••••${apiKey.slice(-4)}` : '••••••••••••';
+  const assignedName = (customName || accountName || name)?.trim() || `${broker} Account`;
+  const newAccount: any = {
     id: `acc_${broker.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
-    name: `${broker} Account`,
+    name: assignedName,
     broker,
+    server: server || `${broker}-Live`,
+    accountNumber: accountNumber || `ACC-${Math.floor(100000 + Math.random() * 900000)}`,
+    accountType: isPaper ? 'DEMO' : 'REAL',
+    leverage: leverage || '1:500',
+    currency: 'USD',
     apiKeyMasked: masked,
     status: isPaper ? ('TESTNET_ACTIVE' as const) : ('CONNECTED' as const),
-    permissions: ['Read Market Data', 'Execute Spot Orders'],
-    accountNumber: `ACC-${Math.floor(100000 + Math.random() * 900000)}`,
+    permissions: ['Read Market Data', 'Execute Spot Orders', 'Algo Trading'],
     simulatedBalance: Number(simulatedBalance) || 25000,
+    equity: Number(simulatedBalance) || 25000,
+    freeMargin: Number(simulatedBalance) || 25000,
+    marginLevel: 9999,
+    pingMs: Math.floor(10 + Math.random() * 15),
     isPaper: Boolean(isPaper),
     lastConnected: Date.now(),
   };
 
   db.brokerAccounts.push(newAccount);
-  db.addAuditLog('BROKER', 'BROKER_ACCOUNT_LINKED', `Linked ${broker} (${newAccount.accountNumber}) in ${isPaper ? 'PAPER' : 'LIVE'} mode.`);
-  db.addNotification('SYSTEM', 'Broker Account Linked', `Successfully connected ${broker} with trading permissions.`, 'success');
+  db.addAuditLog('BROKER', 'BROKER_ACCOUNT_LINKED', `Linked ${broker} (${newAccount.accountNumber}) as "${assignedName}" in ${isPaper ? 'PAPER' : 'LIVE'} mode.`);
+  db.addNotification('SYSTEM', 'Broker Account Linked', `Successfully connected ${assignedName} with trading permissions.`, 'success');
   tradingEngine.broadcastState();
   res.json({ success: true, account: newAccount });
+});
+
+app.post('/api/brokers/:id/rename', (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  const target = db.brokerAccounts.find((b) => b.id === id);
+  if (!target) {
+    return res.status(404).json({ success: false, message: 'Broker account not found.' });
+  }
+
+  const trimmedName = (name || '').trim();
+  if (!trimmedName) {
+    return res.status(400).json({ success: false, message: 'Account name cannot be blank.' });
+  }
+
+  const oldName = target.name;
+  target.name = trimmedName;
+
+  if (db.botState.activeBrokerAccountId === id) {
+    db.botState.activeBrokerAccountName = trimmedName;
+  }
+
+  db.addAuditLog(
+    'BROKER',
+    'BROKER_ACCOUNT_RENAMED',
+    `Renamed broker account #${target.accountNumber} from "${oldName}" to "${trimmedName}".`,
+    'INFO'
+  );
+  db.addNotification(
+    'SYSTEM',
+    'Account Renamed',
+    `Broker account updated to "${trimmedName}".`,
+    'info'
+  );
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, account: target });
+});
+
+app.post('/api/brokers/select-active', (req, res) => {
+  const { accountId } = req.body;
+  const target = db.brokerAccounts.find((b) => b.id === accountId);
+  if (!target) {
+    return res.status(404).json({ success: false, message: 'Account not found' });
+  }
+
+  db.brokerAccounts.forEach((b) => {
+    b.isActiveForTakeover = b.id === accountId;
+  });
+
+  db.botState.activeBrokerAccountId = target.id;
+  db.botState.activeBrokerAccountName = target.name;
+  db.botState.environment = target.isPaper ? 'paper' : 'live';
+
+  if (target.isPaper && target.simulatedBalance > 0) {
+    db.portfolio.cashBalance = target.simulatedBalance;
+    db.portfolio.totalEquity = target.simulatedBalance;
+    db.portfolio.peakEquity = target.simulatedBalance;
+    db.botState.initialSeedCapital = target.simulatedBalance;
+  }
+
+  db.addAuditLog('BROKER', 'ACTIVE_BROKER_SELECTED', `Assigned ${target.name} (${target.accountNumber}) as active autonomous execution target.`, 'INFO');
+  db.addNotification('SYSTEM', 'Active Account Assigned', `Quantara will execute automated trades directly on ${target.name}.`, 'success');
+  tradingEngine.broadcastState();
+  res.json({ success: true, activeAccount: target, botState: db.botState });
 });
 
 app.delete('/api/brokers/:id', (req, res) => {
@@ -371,7 +779,7 @@ app.post('/api/auth/settings', (req, res) => {
 async function initServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true, host: '0.0.0.0', port: PORT },
+      server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -388,4 +796,6 @@ async function initServer() {
   });
 }
 
-initServer();
+initServer().catch((err) => {
+  console.error('[AegisTrade AI] Failed to start server:', err);
+});

@@ -128,30 +128,40 @@ export class RiskManagementEngine {
       };
     }
 
-    // Target risk amount in dollars
-    const targetRiskDollar = (portfolio.totalEquity * settings.maxRiskPerTradePercent) / 100;
+    // Target risk amount in dollars (calibrated for micro-accounts and institutional scaling)
+    const isMicroAccount = portfolio.totalEquity < 250;
+    const effectiveRiskPercent = isMicroAccount ? Math.max(settings.maxRiskPerTradePercent, 2.5) : settings.maxRiskPerTradePercent;
+    let targetRiskDollar = (portfolio.totalEquity * effectiveRiskPercent) / 100;
+    
+    // For ultra-small accounts ($10 - $25), ensure minimum nominal risk floor ($0.20 - $0.50)
+    if (portfolio.totalEquity <= 50) {
+      targetRiskDollar = Math.max(0.20, targetRiskDollar);
+    }
     
     // Position quantity = Risk Amount / Stop Loss Distance Per Unit
     let calculatedQuantity = targetRiskDollar / stopDistance;
     let calculatedSizeUsd = calculatedQuantity * entry;
 
-    // 7. Max Single Asset Exposure Constraint
-    const maxAssetExposureUsd = (portfolio.totalEquity * settings.maxExposurePerAssetPercent) / 100;
+    // 7. Max Single Asset Exposure Constraint (scaled for micro accounts)
+    const maxExposurePercent = isMicroAccount ? 75.0 : settings.maxExposurePerAssetPercent;
+    const maxAssetExposureUsd = (portfolio.totalEquity * maxExposurePercent) / 100;
     if (calculatedSizeUsd > maxAssetExposureUsd) {
-      calculatedSizeUsd = maxAssetExposureUsd;
+      calculatedSizeUsd = Math.max(portfolio.totalEquity <= 50 ? 5.0 : 10.0, maxAssetExposureUsd);
       calculatedQuantity = calculatedSizeUsd / entry;
     }
 
     // 8. Total Portfolio Exposure & Leverage Constraint
     const currentTotalExposureUsd = openPositions.reduce((sum, p) => sum + p.sizeUsd, 0);
-    const maxTotalExposureAllowed = portfolio.totalEquity * settings.maxLeverage * (settings.maxPortfolioExposurePercent / 100);
+    const effectiveLeverage = isMicroAccount ? Math.max(settings.maxLeverage, 3.0) : settings.maxLeverage;
+    const maxTotalExposureAllowed = portfolio.totalEquity * effectiveLeverage * (settings.maxPortfolioExposurePercent / 100);
 
     if (currentTotalExposureUsd + calculatedSizeUsd > maxTotalExposureAllowed) {
       const remainingAllowed = Math.max(0, maxTotalExposureAllowed - currentTotalExposureUsd);
-      if (remainingAllowed < 100) {
+      const minAllowedFloor = portfolio.totalEquity < 100 ? 1.0 : 50.0;
+      if (remainingAllowed < minAllowedFloor) {
         return {
           passed: false,
-          rejectionReason: `Trade rejected: Total portfolio exposure ceiling ($${maxTotalExposureAllowed.toFixed(0)}) reached.`,
+          rejectionReason: `Trade rejected: Total portfolio exposure ceiling ($${maxTotalExposureAllowed.toFixed(2)}) reached.`,
           calculatedPositionSizeUsd: 0,
           calculatedQuantity: 0,
           stopLossPrice: 0,
@@ -165,18 +175,32 @@ export class RiskManagementEngine {
     }
 
     // 9. Available Cash Constraint (assuming no naked margin beyond max leverage)
-    if (calculatedSizeUsd > portfolio.cashBalance * settings.maxLeverage) {
-      calculatedSizeUsd = portfolio.cashBalance * settings.maxLeverage;
+    const cashMultiplier = isMicroAccount ? Math.max(settings.maxLeverage, 3.0) : settings.maxLeverage;
+    if (calculatedSizeUsd > portfolio.cashBalance * cashMultiplier) {
+      calculatedSizeUsd = Math.max(0, portfolio.cashBalance * cashMultiplier);
       calculatedQuantity = calculatedSizeUsd / entry;
     }
 
+    if (calculatedSizeUsd < 0.50 || calculatedQuantity <= 0) {
+      return {
+        passed: false,
+        rejectionReason: `Trade rejected: Calculated position size ($${calculatedSizeUsd.toFixed(2)}) is below execution minimum ($0.50).`,
+        calculatedPositionSizeUsd: 0,
+        calculatedQuantity: 0,
+        stopLossPrice: 0,
+        takeProfitPrice: 0,
+        riskAmountUsd: 0,
+        leverageUsed: 0,
+      };
+    }
+
     const finalRiskAmount = calculatedQuantity * stopDistance;
-    const finalLeverageUsed = Number(((currentTotalExposureUsd + calculatedSizeUsd) / portfolio.totalEquity).toFixed(2));
+    const finalLeverageUsed = Number(((currentTotalExposureUsd + calculatedSizeUsd) / Math.max(1, portfolio.totalEquity)).toFixed(2));
 
     return {
       passed: true,
       calculatedPositionSizeUsd: Number(calculatedSizeUsd.toFixed(2)),
-      calculatedQuantity: Number(calculatedQuantity.toFixed(entry > 100 ? 4 : 2)),
+      calculatedQuantity: Number(calculatedQuantity.toFixed(entry > 1000 ? 6 : entry > 100 ? 4 : 2)),
       stopLossPrice: Number(stopLoss.toFixed(entry > 10 ? 2 : 4)),
       takeProfitPrice: Number(takeProfit.toFixed(entry > 10 ? 2 : 4)),
       riskAmountUsd: Number(finalRiskAmount.toFixed(2)),

@@ -104,21 +104,21 @@ export const RiskManagementView: React.FC<RiskManagementViewProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
             <div className="text-xs text-[#8E9299]">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.closePositionsOnKillSwitch}
                   onChange={(e) => setFormData({ ...formData, closePositionsOnKillSwitch: e.target.checked })}
-                  className="rounded accent-red-500 h-3.5 w-3.5"
+                  className="rounded accent-red-500 h-3.5 w-3.5 shrink-0"
                 />
                 <span>Automatically liquidate all open positions when Kill Switch is engaged</span>
               </label>
             </div>
             <button
               onClick={onTriggerKillSwitch}
-              className="rounded-lg bg-[#EF4444] px-4 py-2 font-bold text-white hover:bg-[#DC2626] transition-all shadow-md shadow-red-900/20"
+              className="w-full sm:w-auto rounded-lg bg-[#EF4444] px-4 py-2 font-bold text-white hover:bg-[#DC2626] transition-all shadow-md shadow-red-900/20 text-center"
             >
               Trigger Emergency Kill Switch
             </button>

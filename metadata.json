@@ -1,6 +1,6 @@
 {
   "name": "Quantara - Intelligent Trading. Automated Execution.",
-  "description": "Quantara is an institutional-grade quantitative trading platform featuring multi-strategy engines, deterministic risk guardrails, AI regime classification, and automated execution.",
+  "description": "Institutional quantitative trading platform with MetaTrader 5 (MT5) broker integration, autonomous trade control, deterministic risk management, and multi-strategy algorithmic execution.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

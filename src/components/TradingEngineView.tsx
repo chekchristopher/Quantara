@@ -69,8 +69,8 @@ export const TradingEngineView: React.FC<TradingEngineViewProps> = ({
           </span>
         </div>
 
-        {/* Horizontal Pipeline Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
+        {/* Pipeline Steps */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
           {/* Step 1 */}
           <div className="rounded-lg border border-[#1F1F23] bg-[#0E0E11] p-3 space-y-1 relative">
             <div className="flex items-center justify-between text-[#8E9299] text-[10px] uppercase tracking-wider font-semibold">

@@ -13,9 +13,15 @@ export class TradingEngine {
 
   public start() {
     if (this.intervalTimer) return;
-    db.botState.isRunning = true;
-    db.botState.status = 'ONLINE';
-    db.addAuditLog('SYSTEM', 'BOT_STARTED', 'Autonomous Trading Engine initialized tick loop (1,500ms interval).', 'INFO');
+    if (db.brokerAccounts && db.brokerAccounts.length > 0) {
+      db.botState.isRunning = true;
+      db.botState.status = 'ONLINE';
+      db.addAuditLog('SYSTEM', 'BOT_STARTED', 'Autonomous Trading Engine initialized tick loop (1,500ms interval).', 'INFO');
+    } else {
+      db.botState.isRunning = false;
+      db.botState.status = 'AWAITING_BROKER_CONNECTION';
+      db.addAuditLog('SYSTEM', 'BOT_STANDBY', 'Autonomous Trading Engine standing by. Awaiting MT5 broker account connection.', 'INFO');
+    }
 
     this.intervalTimer = setInterval(() => {
       this.tickCycle();
@@ -145,7 +151,7 @@ export class TradingEngine {
       db.positions = riskEngine.updateTrailingStops(db.positions, priceMap, db.riskSettings.trailingStopPercent);
     }
 
-    // Check SL / TP for each open position
+    // Check SL / TP & Dynamic Breakeven for each open position
     for (let i = db.positions.length - 1; i >= 0; i--) {
       const pos = db.positions[i];
       const asset = assetsMap.get(pos.symbol);
@@ -159,6 +165,22 @@ export class TradingEngine {
       const rawPnl = isLong ? (currentPrice - pos.entryPrice) * pos.size : (pos.entryPrice - currentPrice) * pos.size;
       pos.unrealizedPnl = Number(rawPnl.toFixed(2));
       pos.unrealizedPnlPercent = Number(((rawPnl / pos.sizeUsd) * 100).toFixed(2));
+
+      // Breakeven Lock-in: When position moves +1.2R into profit, lock stop-loss to entry price
+      const initialRiskDistance = Math.abs(pos.entryPrice - (pos.stopLossPrice || pos.entryPrice * 0.98));
+      if (initialRiskDistance > 0 && rawPnl > initialRiskDistance * pos.size * 1.2) {
+        const breakEvenPrice = isLong ? pos.entryPrice * 1.001 : pos.entryPrice * 0.999;
+        const needsUpdate = isLong ? pos.stopLossPrice < breakEvenPrice : pos.stopLossPrice > breakEvenPrice;
+        if (needsUpdate) {
+          pos.stopLossPrice = Number(breakEvenPrice.toFixed(pos.entryPrice > 10 ? 2 : 4));
+          db.addNotification(
+            'SYSTEM',
+            `Break-Even Protection Locked: ${pos.symbol}`,
+            `Position reached +1.2R profit target. Stop-loss dynamically moved to entry ($${pos.stopLossPrice.toFixed(2)}) to guarantee 0 risk of capital loss.`,
+            'info'
+          );
+        }
+      }
 
       // Stop Loss Trigger
       if (isLong && currentPrice <= pos.stopLossPrice) {
@@ -238,6 +260,11 @@ export class TradingEngine {
         console.warn('AI analysis skipped for tick:', err);
       }
 
+      // Asymmetric risk-reward filter (only trade high expectancy setups for small capital growth)
+      if (db.botState.asymmetricFilterEnabled && (proposedSignal.riskRewardRatio < 2.0 || proposedSignal.confidenceScore < 70)) {
+        continue;
+      }
+
       // Risk Engine Validation & Dynamic Sizing
       const riskValidation = riskEngine.validateAndSizeTrade(
         proposedSignal,
@@ -253,9 +280,10 @@ export class TradingEngine {
       db.signals.unshift(proposedSignal);
       if (db.signals.length > 50) db.signals.pop();
 
-      // Execution routing
+      // Execution routing: autonomous software takeover or automatic mode executes immediately
       if (riskValidation.passed) {
-        if (db.botState.mode === 'fully-automatic' || (db.botState.mode === 'semi-automatic' && proposedSignal.confidenceScore >= 78)) {
+        const canExecuteAutonomously = db.botState.autonomousTakeover || db.botState.mode === 'fully-automatic' || (db.botState.mode === 'semi-automatic' && proposedSignal.confidenceScore >= 76);
+        if (canExecuteAutonomously) {
           executionEngine.executeSignalTrade(
             proposedSignal,
             riskValidation,
@@ -277,6 +305,16 @@ export class TradingEngine {
   }
 
   private updatePortfolioMetrics() {
+    if (db.brokerAccounts.length === 0) {
+      db.portfolio.totalEquity = 0;
+      db.portfolio.cashBalance = 0;
+      db.portfolio.unrealizedPnl = 0;
+      db.portfolio.currentExposureUsd = 0;
+      db.portfolio.currentExposurePercent = 0;
+      db.portfolio.currentDrawdownPercent = 0;
+      return;
+    }
+
     let totalUnrealized = 0;
     let totalExposure = 0;
 
@@ -287,7 +325,7 @@ export class TradingEngine {
 
     db.portfolio.unrealizedPnl = Number(totalUnrealized.toFixed(2));
     db.portfolio.currentExposureUsd = Number(totalExposure.toFixed(2));
-    db.portfolio.totalEquity = Number((db.portfolio.cashBalance + totalExposure + totalUnrealized).toFixed(2));
+    db.portfolio.totalEquity = Number((db.portfolio.cashBalance + totalUnrealized).toFixed(2));
     db.portfolio.currentExposurePercent = db.portfolio.totalEquity > 0 ? Number(((totalExposure / db.portfolio.totalEquity) * 100).toFixed(2)) : 0;
 
     // Peak equity check

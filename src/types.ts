@@ -49,6 +49,16 @@ export interface MarketAsset {
   currentRegime: MarketRegimeType;
   history: OHLCV[];
   indicators: TechnicalIndicators;
+  bidPrice?: number;
+  askPrice?: number;
+  spreadPips?: number;
+  pipValue?: number;
+  digits?: number;
+  source?: string;
+  lastLiveUpdate?: number;
+  isRecommended?: boolean;
+  badge?: string;
+  recommendationReason?: string;
 }
 
 export interface StrategyConfig {
@@ -197,7 +207,7 @@ export interface PortfolioSummary {
 
 export interface BotState {
   isRunning: boolean;
-  status: 'ONLINE' | 'PAUSED' | 'STOPPED' | 'KILL_SWITCH_ENGAGED';
+  status: 'ONLINE' | 'PAUSED' | 'STOPPED' | 'KILL_SWITCH_ENGAGED' | 'AWAITING_BROKER_CONNECTION';
   mode: TradingMode;
   environment: EnvironmentMode;
   activeStrategyId: string;
@@ -207,19 +217,60 @@ export interface BotState {
   lastTickTimestamp: number;
   currentRegime: MarketRegimeType;
   activeRiskLevel: 'SAFE' | 'MODERATE' | 'ELEVATED' | 'CRITICAL';
+  autonomousTakeover: boolean;
+  activeBrokerAccountId?: string;
+  activeBrokerAccountName?: string;
+  compoundingMode: 'standard' | 'micro-wealth-accelerator';
+  initialSeedCapital: number;
+  microAccountTarget: number;
+  asymmetricFilterEnabled: boolean;
+}
+
+export interface CompoundingMilestone {
+  id: string;
+  stage: number;
+  title: string;
+  targetBalance: number;
+  phase: string;
+  description: string;
+  achieved: boolean;
+  progressPercent: number;
+}
+
+export interface MT5TradeControlConfig {
+  autoTradeEnabled: boolean;
+  prioritizeGold: boolean;
+  riskPerTradePercent: number;
+  lotSizeMode: 'DYNAMIC' | 'FIXED';
+  fixedLotSize: number;
+  maxOpenTrades: number;
+  dailyLossHaltPercent: number;
+  trailingStopPips: number;
+  takeProfitRatio: number;
 }
 
 export interface BrokerAccount {
   id: string;
   name: string;
-  broker: 'Binance' | 'Coinbase Pro' | 'Alpaca' | 'Interactive Brokers' | 'Kraken' | 'Bybit';
+  broker: string;
+  server?: string;
+  accountNumber: string;
+  accountType?: 'REAL' | 'DEMO';
+  leverage?: string;
+  currency?: string;
   apiKeyMasked: string;
   status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'TESTNET_ACTIVE';
   permissions: string[];
-  accountNumber: string;
   simulatedBalance: number;
+  equity?: number;
+  freeMargin?: number;
+  marginLevel?: number;
+  pingMs?: number;
+  terminalVersion?: string;
   isPaper: boolean;
   lastConnected: number;
+  isActiveForTakeover?: boolean;
+  autoTradeControl?: MT5TradeControlConfig;
 }
 
 export interface NotificationItem {

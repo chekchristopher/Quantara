@@ -14,6 +14,10 @@ export class ExecutionEngine {
     environment: EnvironmentMode,
     mode: 'manual' | 'semi-automatic' | 'fully-automatic'
   ): { success: boolean; position?: Position; order?: Order; message: string } {
+    if (db.brokerAccounts.length === 0) {
+      return { success: false, message: 'No broker account connected. Please connect a Demo or Real account first.' };
+    }
+
     if (!riskValidation.passed) {
       return { success: false, message: riskValidation.rejectionReason || 'Risk check failed' };
     }
@@ -62,10 +66,11 @@ export class ExecutionEngine {
 
     db.orders.unshift(order);
 
-    // Deduct cash and fee from portfolio
-    db.portfolio.cashBalance -= sizeUsd + feesUsd;
-    db.portfolio.currentExposureUsd += sizeUsd;
-    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / db.portfolio.totalEquity) * 100).toFixed(2));
+    // Deduct fee from portfolio cash balance (Leveraged margin CFD model)
+    db.portfolio.cashBalance = Number((db.portfolio.cashBalance - feesUsd).toFixed(2));
+    db.portfolio.currentExposureUsd = Number((db.portfolio.currentExposureUsd + sizeUsd).toFixed(2));
+    const equityBase = Math.max(1, db.portfolio.totalEquity);
+    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / equityBase) * 100).toFixed(2));
     db.portfolio.totalTradesExecuted += 1;
     db.botState.tradesExecutedToday += 1;
 
@@ -135,13 +140,14 @@ export class ExecutionEngine {
     const finalRealizedPnl = Number((rawPnl - fee).toFixed(2));
     const pnlPercent = Number(((finalRealizedPnl / pos.sizeUsd) * 100).toFixed(2));
 
-    // Update portfolio balances
-    db.portfolio.cashBalance += pos.sizeUsd + finalRealizedPnl;
-    db.portfolio.realizedPnlToday += finalRealizedPnl;
-    db.portfolio.totalRealizedPnl += finalRealizedPnl;
-    db.portfolio.totalEquity += finalRealizedPnl;
-    db.portfolio.currentExposureUsd = Math.max(0, db.portfolio.currentExposureUsd - pos.sizeUsd);
-    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / db.portfolio.totalEquity) * 100).toFixed(2));
+    // Update portfolio balances (Leveraged margin CFD model: realized PnL adjusts cash balance)
+    db.portfolio.cashBalance = Number((db.portfolio.cashBalance + finalRealizedPnl).toFixed(2));
+    db.portfolio.realizedPnlToday = Number((db.portfolio.realizedPnlToday + finalRealizedPnl).toFixed(2));
+    db.portfolio.totalRealizedPnl = Number((db.portfolio.totalRealizedPnl + finalRealizedPnl).toFixed(2));
+    db.portfolio.totalEquity = Number((db.portfolio.cashBalance).toFixed(2));
+    db.portfolio.currentExposureUsd = Math.max(0, Number((db.portfolio.currentExposureUsd - pos.sizeUsd).toFixed(2)));
+    const equityBase = Math.max(1, db.portfolio.totalEquity);
+    db.portfolio.currentExposurePercent = Number(((db.portfolio.currentExposureUsd / equityBase) * 100).toFixed(2));
 
     // Recalculate win rate & profit factor
     const allClosed = [...db.tradesHistory];
