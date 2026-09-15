@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkbookView } from './components/WorkbookView';
@@ -12,6 +12,9 @@ import { SystemTestingView } from './components/SystemTestingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { TradeExplanationModal } from './components/TradeExplanationModal';
 import { LiveTradingConfirmationModal } from './components/LiveTradingConfirmationModal';
+import { EnterpriseAuthModal } from './components/EnterpriseAuthModal';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { firestoreSync } from './services/firestoreSync';
 import { QuantaraLogoMark } from './components/QuantaraLogo';
 import { api, SnapshotData } from './services/api';
 import {
@@ -30,8 +33,10 @@ import {
   TradingSignal,
 } from './types';
 
-export default function App() {
+function QuantaraApp() {
+  const { user, profile, cloudSyncStatus } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // Core Application State
   const [botState, setBotState] = useState<BotState>({
@@ -149,29 +154,113 @@ export default function App() {
     };
   }, []);
 
+  // Sync with Firestore Cloud Database for authenticated user
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Real-time risk settings subscription from Firestore
+    const unsubRisk = firestoreSync.subscribeRiskSettings(user.uid, (cloudRisk) => {
+      if (cloudRisk && Object.keys(cloudRisk).length > 0) {
+        setRiskSettings((prev) => ({ ...prev, ...cloudRisk }));
+      }
+    });
+
+    // Real-time broker profiles subscription from Firestore
+    const unsubBrokers = firestoreSync.subscribeBrokers(user.uid, (cloudBrokers) => {
+      if (cloudBrokers && cloudBrokers.length > 0) {
+        setBrokerAccounts(cloudBrokers);
+      }
+    });
+
+    return () => {
+      unsubRisk();
+      unsubBrokers();
+    };
+  }, [user?.uid]);
+
+  // Sync trade history items into user's private Firestore journal
+  const syncedTradeIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user?.uid || !tradesHistory.length) return;
+    tradesHistory.forEach((trade) => {
+      if (!syncedTradeIdsRef.current.has(trade.id)) {
+        syncedTradeIdsRef.current.add(trade.id);
+        firestoreSync.logJournalTrade(user.uid, trade).catch(console.warn);
+      }
+    });
+  }, [user?.uid, tradesHistory]);
+
   // Action handlers
   const handleToggleBot = async () => {
     if (botState.isRunning) {
       await api.pauseBot();
+      if (user?.uid) {
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'PAUSE_BOT',
+          category: 'SYSTEM',
+          details: `Trading bot paused for strategy: ${botState.activeStrategyName}`,
+          severity: 'INFO',
+        }).catch(console.warn);
+      }
     } else {
       await api.startBot();
+      if (user?.uid) {
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'START_BOT',
+          category: 'SYSTEM',
+          details: `Trading bot resumed in ${botState.mode} mode`,
+          severity: 'INFO',
+        }).catch(console.warn);
+      }
     }
   };
 
   const handleTriggerKillSwitch = async () => {
     if (riskSettings.killSwitchActive) {
       await api.resetKillSwitch();
+      if (user?.uid) {
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'RESET_KILL_SWITCH',
+          category: 'KILL_SWITCH',
+          details: 'Master kill switch deactivated by operator',
+          severity: 'INFO',
+        }).catch(console.warn);
+      }
     } else {
       await api.engageKillSwitch('Emergency Stop Activated via Operator HUD', riskSettings.closePositionsOnKillSwitch);
+      if (user?.uid) {
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'ENGAGE_KILL_SWITCH',
+          category: 'KILL_SWITCH',
+          details: 'Master emergency kill switch engaged - all open exposure halted',
+          severity: 'CRITICAL',
+        }).catch(console.warn);
+      }
     }
   };
 
   const handleClosePosition = async (id: string) => {
     await api.closePosition(id);
+    if (user?.uid) {
+      firestoreSync.appendAuditLog(user.uid, {
+        action: 'CLOSE_POSITION',
+        category: 'TRADE',
+        details: { positionId: id },
+        severity: 'INFO',
+      }).catch(console.warn);
+    }
   };
 
   const handleEmergencyCloseAll = async () => {
     await api.emergencyCloseAllPositions();
+    if (user?.uid) {
+      firestoreSync.appendAuditLog(user.uid, {
+        action: 'EMERGENCY_CLOSE_ALL',
+        category: 'RISK',
+        details: 'Emergency liquidation of all open portfolio positions requested',
+        severity: 'CRITICAL',
+      }).catch(console.warn);
+    }
   };
 
   const handleSetTradingMode = async (mode: TradingMode) => {
@@ -213,17 +302,41 @@ export default function App() {
   };
 
   const handleUpdateRiskSettings = async (settings: Partial<RiskSettings>) => {
-    return api.updateRiskSettings(settings);
+    const res = await api.updateRiskSettings(settings);
+    if (user?.uid) {
+      const merged = { ...riskSettings, ...settings };
+      firestoreSync.saveRiskSettings(user.uid, merged).catch(console.warn);
+      firestoreSync.appendAuditLog(user.uid, {
+        action: 'UPDATE_RISK_SETTINGS',
+        category: 'RISK',
+        details: { updatedKeys: Object.keys(settings) },
+      }).catch(console.warn);
+    }
+    return res;
   };
 
   const handleConnectBroker = async (payload: any) => {
-    return api.connectBroker(payload);
+    const res = await api.connectBroker(payload);
+    if (user?.uid && res?.account) {
+      firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+    }
+    return res;
   };
 
   const handleLoginMT5Broker = async (payload: any) => {
     const res = await api.loginMT5Broker(payload);
     const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    if (Array.isArray(brokers)) {
+      setBrokerAccounts(brokers);
+      if (user?.uid) {
+        brokers.forEach((b) => firestoreSync.saveBrokerProfile(user.uid, b).catch(console.warn));
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'MT5_BROKER_LOGIN',
+          category: 'BROKER',
+          details: { broker: payload.brokerName, server: payload.server, login: payload.login },
+        }).catch(console.warn);
+      }
+    }
     const assetsData = await api.getMarketAssets();
     if (Array.isArray(assetsData)) setAssets(assetsData);
     return res;
@@ -245,13 +358,34 @@ export default function App() {
   };
 
   const handleDisconnectBroker = async (id: string) => {
-    return api.disconnectBroker(id);
+    const res = await api.disconnectBroker(id);
+    if (user?.uid) {
+      firestoreSync.deleteBrokerProfile(user.uid, id).catch(console.warn);
+      firestoreSync.appendAuditLog(user.uid, {
+        action: 'DISCONNECT_BROKER',
+        category: 'BROKER',
+        details: { brokerId: id },
+        severity: 'WARN',
+      }).catch(console.warn);
+    }
+    return res;
   };
 
   const handleRenameBroker = async (id: string, name: string) => {
     const res = await api.renameBrokerAccount(id, name);
     const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    if (Array.isArray(brokers)) {
+      setBrokerAccounts(brokers);
+      if (user?.uid) {
+        const renamed = brokers.find((b) => b.id === id);
+        if (renamed) firestoreSync.saveBrokerProfile(user.uid, renamed).catch(console.warn);
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'RENAME_BROKER',
+          category: 'BROKER',
+          details: { brokerId: id, newName: name },
+        }).catch(console.warn);
+      }
+    }
     return res;
   };
 
@@ -315,6 +449,7 @@ export default function App() {
         onRequestLiveMode={handleRequestLiveMode}
         onSwitchToPaper={handleSwitchToPaper}
         onMarkNotificationsRead={handleMarkNotificationsRead}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main View Container */}
@@ -446,6 +581,12 @@ export default function App() {
         onCancel={() => setShowLiveConfirmation(false)}
       />
 
+      {/* Enterprise Authentication & Gmail Login Modal */}
+      <EnterpriseAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
       {/* Global Status Bar Footer */}
       <footer className="border-t border-[#1F1F23] bg-[#0E0E11] py-3 px-4 sm:px-8 text-xs font-mono text-[#8E9299]">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
@@ -458,6 +599,8 @@ export default function App() {
             <span>ACTIVE STRATEGY: {botState.activeStrategyName}</span>
             <span className="text-[#1F1F23]">|</span>
             <span>MODE: {botState.mode.toUpperCase()} ({botState.environment.toUpperCase()})</span>
+            <span className="text-[#1F1F23]">|</span>
+            <span className="text-blue-400">FIRESTORE: quantara-261d0 ({cloudSyncStatus.toUpperCase()})</span>
           </div>
           <div className="flex items-center space-x-2 text-[11px] text-[#8E9299]">
             <QuantaraLogoMark size="sm" showGlow={false} className="w-5 h-5 mr-0.5" />
@@ -470,3 +613,12 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <QuantaraApp />
+    </AuthProvider>
+  );
+}
+

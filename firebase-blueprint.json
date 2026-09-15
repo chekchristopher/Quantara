@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Enterprise user identity, access role, and organization tier.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "role": { "type": "string", "enum": ["operator", "senior_analyst", "risk_officer", "admin"] },
+        "enterpriseTier": { "type": "string", "enum": ["Standard", "Institutional Pro", "Enterprise Dedicated"] },
+        "emailVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "email", "role", "enterpriseTier", "createdAt", "updatedAt"]
+    },
+    "UserRiskSettings": {
+      "title": "UserRiskSettings",
+      "description": "Deterministic institutional risk parameters configured per operator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "maxRiskPerTradePercent": { "type": "number" },
+        "maxDailyLossPercent": { "type": "number" },
+        "maxWeeklyLossPercent": { "type": "number" },
+        "maxAccountDrawdownPercent": { "type": "number" },
+        "maxOpenPositions": { "type": "number" },
+        "maxExposurePerAssetPercent": { "type": "number" },
+        "maxPortfolioExposurePercent": { "type": "number" },
+        "maxLeverage": { "type": "number" },
+        "trailingStopEnabled": { "type": "boolean" },
+        "trailingStopPercent": { "type": "number" },
+        "killSwitchActive": { "type": "boolean" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "maxRiskPerTradePercent", "maxDailyLossPercent", "maxWeeklyLossPercent", "maxAccountDrawdownPercent", "maxOpenPositions", "updatedAt"]
+    },
+    "UserBrokerProfile": {
+      "title": "UserBrokerProfile",
+      "description": "Connected MT5 or institutional broker account configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "brokerName": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 64 },
+        "server": { "type": "string", "maxLength": 128 },
+        "platform": { "type": "string", "maxLength": 32 },
+        "environment": { "type": "string", "maxLength": 32 },
+        "status": { "type": "string", "maxLength": 32 },
+        "balance": { "type": "number" },
+        "equity": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 16 },
+        "leverage": { "type": "number" },
+        "isCompoundingActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "brokerName", "accountNumber", "server", "platform", "environment", "status", "createdAt", "updatedAt"]
+    },
+    "UserTradingJournal": {
+      "title": "UserTradingJournal",
+      "description": "Persistent trade record, execution metrics, and operator notes.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "symbol": { "type": "string", "maxLength": 32 },
+        "direction": { "type": "string", "maxLength": 16 },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "pnlUsd": { "type": "number" },
+        "pnlPercent": { "type": "number" },
+        "strategyId": { "type": "string", "maxLength": 64 },
+        "strategyName": { "type": "string", "maxLength": 128 },
+        "marketRegime": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "maxLength": 32 },
+        "notes": { "type": "string", "maxLength": 1024 },
+        "openedAt": { "type": "string", "maxLength": 64 },
+        "closedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "symbol", "direction", "entryPrice", "quantity", "strategyId", "status", "openedAt"]
+    },
+    "UserAuditLog": {
+      "title": "UserAuditLog",
+      "description": "Immutable telemetry and compliance audit events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "level": { "type": "string", "maxLength": 32 },
+        "category": { "type": "string", "maxLength": 64 },
+        "action": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 1024 }
+      },
+      "required": ["id", "userId", "timestamp", "level", "category", "action"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private user identity and enterprise authorization credentials."
+    },
+    "/users/{userId}/settings/risk": {
+      "schema": "UserRiskSettings",
+      "description": "Risk management configuration and circuit breaker limits for the user."
+    },
+    "/users/{userId}/brokers/{brokerId}": {
+      "schema": "UserBrokerProfile",
+      "description": "MT5 and broker profiles connected to the user's workspace."
+    },
+    "/users/{userId}/journal/{tradeId}": {
+      "schema": "UserTradingJournal",
+      "description": "Trade log journal, executed orders, and performance tracking."
+    },
+    "/users/{userId}/auditLogs/{logId}": {
+      "schema": "UserAuditLog",
+      "description": "Immutable compliance and security logs generated during trading sessions."
+    }
+  }
+}

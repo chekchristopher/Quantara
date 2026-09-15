@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { BotState, EnvironmentMode, NotificationItem, RiskSettings, TradingMode } from '../types';
 import { QuantaraLogoMark } from './QuantaraLogo';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   currentTab: string;
@@ -37,6 +38,7 @@ interface NavbarProps {
   onSwitchToPaper: () => void;
   onMarkNotificationsRead: () => void;
   onSelectSignalExplanation?: (id: string) => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -51,7 +53,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onRequestLiveMode,
   onSwitchToPaper,
   onMarkNotificationsRead,
+  onOpenAuthModal,
 }) => {
+  const { user, profile, cloudSyncStatus } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [timeUtc, setTimeUtc] = useState('');
@@ -270,6 +274,78 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
+            {/* Enterprise Cloud DB Indicator */}
+            <div
+              className="hidden xl:flex items-center space-x-1.5 rounded-lg border border-[#1F2330] bg-[#12151F] px-2.5 py-1.5 text-[11px] font-mono text-[#8E9299]"
+              title="Cloud Database: quantara-261d0 (Firestore Enterprise)"
+            >
+              <Database className="h-3.5 w-3.5 text-blue-400" />
+              <span className="text-zinc-300">quantara-261d0</span>
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  cloudSyncStatus === 'synced'
+                    ? 'bg-emerald-400 animate-pulse'
+                    : cloudSyncStatus === 'syncing'
+                    ? 'bg-cyan-400 animate-spin'
+                    : 'bg-amber-400'
+                }`}
+              />
+            </div>
+
+            {/* Enterprise Auth & Account Profile Button */}
+            {onOpenAuthModal && (
+              <button
+                type="button"
+                onClick={onOpenAuthModal}
+                className={`flex items-center space-x-2 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all ${
+                  user
+                    ? 'border-blue-500/40 bg-blue-950/25 hover:bg-blue-900/30 text-white shadow-sm'
+                    : 'border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/30 hover:to-cyan-600/30 text-blue-200 hover:text-white'
+                }`}
+              >
+                {user ? (
+                  <>
+                    <div className="h-5 w-5 rounded-full bg-blue-500/20 border border-blue-400/40 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300 overflow-hidden shrink-0">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        user.email?.[0].toUpperCase() || 'U'
+                      )}
+                    </div>
+                    <span className="hidden sm:inline font-mono text-[11px] font-semibold text-zinc-200 max-w-[110px] truncate">
+                      {profile?.displayName || user.displayName || user.email?.split('@')[0]}
+                    </span>
+                    <span className="hidden lg:inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {profile?.role || 'OPERATOR'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {/* Google G Icon */}
+                    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.29 21.36 7.36 24 12 24z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.29 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                      />
+                    </svg>
+                    <span className="font-medium">Sign In / Gmail</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Mobile Hamburger Toggle Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -327,6 +403,46 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {/* Mobile User Profile & Cloud DB Header Card */}
+            <div className="rounded-xl border border-blue-500/30 bg-[#0E121E] p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <div className="h-8 w-8 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center font-mono text-xs font-bold text-blue-300 overflow-hidden">
+                    {user?.photoURL ? (
+                      <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      user?.email?.[0].toUpperCase() || 'U'
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-xs font-bold text-white">
+                        {user ? (profile?.displayName || user.displayName || user.email?.split('@')[0]) : 'Guest Operator'}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        {user ? (profile?.role || 'OPERATOR') : 'LOCAL'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[#8E9299] font-mono truncate max-w-[180px]">
+                      {user ? user.email : 'DB: quantara-261d0'}
+                    </p>
+                  </div>
+                </div>
+
+                {onOpenAuthModal && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenAuthModal();
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 transition-colors"
+                  >
+                    {user ? 'Account' : 'Sign In'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Quick Controls Grid in Drawer */}
