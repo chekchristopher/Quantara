@@ -21,6 +21,8 @@ export interface UserProfileDoc {
   email: string;
   displayName: string;
   photoURL?: string;
+  bio?: string;
+  desk?: string;
   role: 'operator' | 'senior_analyst' | 'risk_officer' | 'admin';
   enterpriseTier: 'Standard' | 'Institutional Pro' | 'Enterprise Dedicated';
   emailVerified: boolean;
@@ -56,8 +58,8 @@ export const firestoreSync = {
       if (snap.exists()) {
         const existingData = snap.data() as UserProfileDoc;
         const updatedData: Partial<UserProfileDoc> = {
-          displayName: user.displayName || existingData.displayName || user.email?.split('@')[0] || 'Enterprise Operator',
-          photoURL: user.photoURL || existingData.photoURL || '',
+          displayName: existingData.displayName || user.displayName || user.email?.split('@')[0] || 'Enterprise Operator',
+          photoURL: existingData.photoURL || user.photoURL || '',
           emailVerified: user.emailVerified,
           updatedAt: now,
         };
@@ -81,6 +83,52 @@ export const firestoreSync = {
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // Update User Profile (display name, custom photo URL, role, bio, desk)
+  async updateUserProfileData(
+    userId: string,
+    data: { displayName?: string; photoURL?: string; role?: any; bio?: string; desk?: string }
+  ): Promise<UserProfileDoc> {
+    const userDocRef = doc(db, 'users', userId);
+    const path = `users/${userId}`;
+    try {
+      const snap = await getDoc(userDocRef);
+      const now = new Date().toISOString();
+      const updates: any = {
+        updatedAt: now,
+      };
+      if (data.displayName !== undefined) updates.displayName = data.displayName;
+      if (data.photoURL !== undefined) updates.photoURL = data.photoURL;
+      if (data.role !== undefined) updates.role = data.role;
+      if (data.bio !== undefined) updates.bio = data.bio;
+      if (data.desk !== undefined) updates.desk = data.desk;
+
+      if (snap.exists()) {
+        await updateDoc(userDocRef, updates);
+        return { ...(snap.data() as UserProfileDoc), ...updates };
+      } else {
+        const isDefaultAdmin = auth.currentUser?.email === 'chekchris85@gmail.com';
+        const fullDoc: UserProfileDoc = {
+          id: userId,
+          email: auth.currentUser?.email || 'operator@quantara.internal',
+          displayName: data.displayName || auth.currentUser?.displayName || 'Enterprise Operator',
+          photoURL: data.photoURL || '',
+          role: data.role || (isDefaultAdmin ? 'admin' : 'operator'),
+          enterpriseTier: isDefaultAdmin ? 'Enterprise Dedicated' : 'Standard',
+          emailVerified: auth.currentUser?.emailVerified || false,
+          bio: data.bio || '',
+          desk: data.desk || '',
+          createdAt: now,
+          updatedAt: now,
+        };
+        await setDoc(userDocRef, fullDoc);
+        return fullDoc;
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
     }
   },
 

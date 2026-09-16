@@ -5,10 +5,12 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  Calendar,
   Check,
   CheckCircle,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Cpu,
   Database,
   Dices,
@@ -551,7 +553,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex items-center space-x-1 bg-[#141416] p-1 rounded-lg border border-[#1F1F23]">
+        <div className="flex items-center space-x-1 bg-[#141416] p-1 rounded-lg border border-[#1F1F23] overflow-x-auto scrollbar-none max-w-full shrink-0">
           <button
             onClick={() => setActiveTab('control')}
             className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold transition-all flex items-center space-x-1.5 ${
@@ -1094,36 +1096,26 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-[#1F1F23] text-[#8E9299] text-[10px] uppercase">
-                        <th className="pb-2">Ticket #</th>
-                        <th className="pb-2">Symbol</th>
-                        <th className="pb-2">Type</th>
-                        <th className="pb-2">Volume</th>
-                        <th className="pb-2">Open Price</th>
-                        <th className="pb-2">Current</th>
-                        <th className="pb-2">Stop Loss</th>
-                        <th className="pb-2">Take Profit</th>
-                        <th className="pb-2">Floating P/L</th>
-                        <th className="pb-2 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1F1F23]">
-                      {positions.map((pos) => {
-                        const isProfit = pos.unrealizedPnl >= 0;
-                        const ticketNum = pos.id.replace('pos_', '').slice(-7);
-                        return (
-                          <tr key={pos.id} className="hover:bg-[#1A1A1E] transition-colors">
-                            <td className="py-2.5 font-mono text-blue-400 font-semibold">#{ticketNum}</td>
-                            <td className="py-2.5 font-bold text-white flex items-center space-x-1">
-                              <span>{pos.symbol}</span>
+                <>
+                  {/* Mobile Ticket Cards (md:hidden) */}
+                  <div className="md:hidden space-y-3">
+                    {positions.map((pos) => {
+                      const isProfit = pos.unrealizedPnl >= 0;
+                      const ticketNum = pos.id.replace('pos_', '').slice(-7);
+                      const openedDate = new Date(pos.openedAt || Date.now());
+                      const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                      const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      return (
+                        <div
+                          key={pos.id}
+                          className="rounded-lg border border-[#1F1F23] bg-[#0E0E11] p-3.5 space-y-2.5 font-mono text-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-white text-sm">{pos.symbol}</span>
                               {pos.symbol === 'XAU/USD' && (
-                                <span className="rounded bg-yellow-500/20 text-yellow-400 text-[9px] px-1 py-0.2">GOLD</span>
+                                <span className="rounded bg-yellow-500/20 text-yellow-400 text-[9px] px-1 py-0.2 font-bold">GOLD</span>
                               )}
-                            </td>
-                            <td className="py-2.5">
                               <span
                                 className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                                   pos.side === 'LONG'
@@ -1133,46 +1125,160 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                               >
                                 {pos.side === 'LONG' ? 'BUY' : 'SELL'}
                               </span>
-                            </td>
-                            <td className="py-2.5 font-semibold text-zinc-200">
-                              {pos.size >= 100 ? `${(pos.size / 100).toFixed(2)} Lots` : `${pos.size} Units`}
-                            </td>
-                            <td className="py-2.5 text-zinc-300">
-                              ${pos.entryPrice.toFixed(pos.entryPrice > 100 ? 2 : 4)}
-                            </td>
-                            <td className="py-2.5 text-white font-bold">
-                              ${pos.currentPrice.toFixed(pos.currentPrice > 100 ? 2 : 4)}
-                            </td>
-                            <td className="py-2.5 text-[#EF4444]">
-                              ${pos.stopLossPrice.toFixed(pos.stopLossPrice > 100 ? 2 : 4)}
-                            </td>
-                            <td className="py-2.5 text-[#10B981]">
-                              ${pos.takeProfitPrice.toFixed(pos.takeProfitPrice > 100 ? 2 : 4)}
-                            </td>
-                            <td className="py-2.5">
-                              <span className={`font-bold ${isProfit ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                                {isProfit ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
-                                <span className="text-[10px] ml-1 opacity-70">
-                                  ({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)
-                                </span>
+                            </div>
+                            <span className="text-blue-400 text-[11px]">#{ticketNum}</span>
+                          </div>
+
+                          {/* Time & Date Opened Badge */}
+                          <div className="flex items-center justify-between text-[11px] bg-[#141418] px-2.5 py-1.5 rounded border border-[#1F1F23]/80">
+                            <div className="flex items-center space-x-1.5 text-zinc-300">
+                              <Clock className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                              <span className="text-[#8E9299] text-[10px]">Opened:</span>
+                              <span className="font-semibold text-zinc-200">{dateStr}</span>
+                              <span className="text-[#8E9299] text-[10px]">{timeStr}</span>
+                            </div>
+                            <span className="text-[10px] text-zinc-400 truncate max-w-[110px]">
+                              {pos.strategyName || 'Auto-Engine'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px] py-1 border-y border-[#1F1F23]/60">
+                            <div>
+                              <span className="text-[#8E9299] block text-[10px]">Volume:</span>
+                              <span className="text-zinc-200 font-semibold">
+                                {pos.size >= 100 ? `${(pos.size / 100).toFixed(2)} Lots` : `${pos.size} Units`}
                               </span>
-                            </td>
-                            <td className="py-2.5 text-right">
-                              {onClosePosition && (
-                                <button
-                                  onClick={() => onClosePosition(pos.id)}
-                                  className="rounded bg-red-600/20 hover:bg-red-600/40 text-red-300 text-[10px] px-2 py-1 font-semibold border border-red-500/30 transition-colors"
+                            </div>
+                            <div>
+                              <span className="text-[#8E9299] block text-[10px]">Floating P/L:</span>
+                              <span className={`font-bold ${isProfit ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                                {isProfit ? '+' : ''}${pos.unrealizedPnl.toFixed(2)} ({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[#8E9299] block text-[10px]">Entry / Current:</span>
+                              <span className="text-zinc-300">
+                                ${pos.entryPrice.toFixed(pos.entryPrice > 100 ? 2 : 4)} → ${pos.currentPrice.toFixed(pos.currentPrice > 100 ? 2 : 4)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[#8E9299] block text-[10px]">SL / TP:</span>
+                              <span className="text-zinc-300">
+                                <span className="text-[#EF4444]">${pos.stopLossPrice.toFixed(pos.stopLossPrice > 100 ? 2 : 4)}</span>
+                                {' / '}
+                                <span className="text-[#10B981]">${pos.takeProfitPrice.toFixed(pos.takeProfitPrice > 100 ? 2 : 4)}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {onClosePosition && (
+                            <button
+                              onClick={() => onClosePosition(pos.id)}
+                              className="w-full py-1.5 rounded bg-red-600/20 hover:bg-red-600/40 text-red-300 text-xs font-semibold border border-red-500/30 transition-colors text-center"
+                            >
+                              Close Position
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Positions Table (hidden md:block) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left font-mono text-xs min-w-[780px]">
+                      <thead>
+                        <tr className="border-b border-[#1F1F23] text-[#8E9299] text-[10px] uppercase">
+                          <th className="pb-2">Ticket #</th>
+                          <th className="pb-2">Time / Date</th>
+                          <th className="pb-2">Symbol</th>
+                          <th className="pb-2">Type</th>
+                          <th className="pb-2">Volume</th>
+                          <th className="pb-2">Open Price</th>
+                          <th className="pb-2">Current</th>
+                          <th className="pb-2">Stop Loss</th>
+                          <th className="pb-2">Take Profit</th>
+                          <th className="pb-2">Floating P/L</th>
+                          <th className="pb-2 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1F1F23]">
+                        {positions.map((pos) => {
+                          const isProfit = pos.unrealizedPnl >= 0;
+                          const ticketNum = pos.id.replace('pos_', '').slice(-7);
+                          const openedDate = new Date(pos.openedAt || Date.now());
+                          const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                          const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                          return (
+                            <tr key={pos.id} className="hover:bg-[#1A1A1E] transition-colors">
+                              <td className="py-2.5 font-mono text-blue-400 font-semibold">#{ticketNum}</td>
+                              <td className="py-2.5 font-mono text-xs whitespace-nowrap">
+                                <div className="text-zinc-200 font-medium text-[11px] flex items-center space-x-1">
+                                  <Calendar className="h-3 w-3 text-zinc-500 shrink-0" />
+                                  <span>{dateStr}</span>
+                                </div>
+                                <div className="text-[10px] text-[#8E9299] flex items-center space-x-1 mt-0.5">
+                                  <Clock className="h-2.5 w-2.5 text-blue-400 shrink-0" />
+                                  <span>{timeStr}</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 font-bold text-white flex items-center space-x-1">
+                                <span>{pos.symbol}</span>
+                                {pos.symbol === 'XAU/USD' && (
+                                  <span className="rounded bg-yellow-500/20 text-yellow-400 text-[9px] px-1 py-0.2">GOLD</span>
+                                )}
+                              </td>
+                              <td className="py-2.5">
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                    pos.side === 'LONG'
+                                      ? 'bg-[#10B981]/15 text-[#10B981]'
+                                      : 'bg-[#EF4444]/15 text-[#EF4444]'
+                                  }`}
                                 >
-                                  Close
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  {pos.side === 'LONG' ? 'BUY' : 'SELL'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 font-semibold text-zinc-200">
+                                {pos.size >= 100 ? `${(pos.size / 100).toFixed(2)} Lots` : `${pos.size} Units`}
+                              </td>
+                              <td className="py-2.5 text-zinc-300">
+                                ${pos.entryPrice.toFixed(pos.entryPrice > 100 ? 2 : 4)}
+                              </td>
+                              <td className="py-2.5 text-white font-bold">
+                                ${pos.currentPrice.toFixed(pos.currentPrice > 100 ? 2 : 4)}
+                              </td>
+                              <td className="py-2.5 text-[#EF4444]">
+                                ${pos.stopLossPrice.toFixed(pos.stopLossPrice > 100 ? 2 : 4)}
+                              </td>
+                              <td className="py-2.5 text-[#10B981]">
+                                ${pos.takeProfitPrice.toFixed(pos.takeProfitPrice > 100 ? 2 : 4)}
+                              </td>
+                              <td className="py-2.5">
+                                <span className={`font-bold ${isProfit ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                                  {isProfit ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
+                                  <span className="text-[10px] ml-1 opacity-70">
+                                    ({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)
+                                  </span>
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right">
+                                {onClosePosition && (
+                                  <button
+                                    onClick={() => onClosePosition(pos.id)}
+                                    className="rounded bg-red-600/20 hover:bg-red-600/40 text-red-300 text-[10px] px-2 py-1 font-semibold border border-red-500/30 transition-colors"
+                                  >
+                                    Close
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>

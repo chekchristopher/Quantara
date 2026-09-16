@@ -25,14 +25,24 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   resendVerification: () => Promise<void>;
+  updateUserProfile: (data: { displayName?: string; photoURL?: string; role?: any; bio?: string; desk?: string }) => Promise<void>;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to retrieve cached profile
+const getCachedProfile = (): UserProfileDoc | null => {
+  try {
+    const raw = localStorage.getItem('quantara_custom_profile');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [profile, setProfile] = useState<UserProfileDoc | null>(null);
+  const [profile, setProfile] = useState<UserProfileDoc | null>(getCachedProfile);
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'guest'>('guest');
@@ -47,14 +57,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Probe connection
           await validateFirestoreConnection();
           // Sync profile
+          const cached = getCachedProfile();
           const userProf = await firestoreSync.syncUserProfile({
             uid: currentUser.uid,
             email: currentUser.email,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
+            displayName: cached?.displayName || currentUser.displayName,
+            photoURL: cached?.photoURL || currentUser.photoURL,
             emailVerified: currentUser.emailVerified,
           });
           setProfile(userProf);
+          try {
+            localStorage.setItem('quantara_custom_profile', JSON.stringify(userProf));
+          } catch (e) {}
           setCloudSyncStatus('synced');
         } catch (err: any) {
           console.warn('Profile sync / Firestore notice:', err?.message || err);
@@ -62,7 +76,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCloudSyncStatus('offline');
         }
       } else {
-        setProfile(null);
+        const cached = getCachedProfile();
+        setProfile(cached);
         setCloudSyncStatus('guest');
       }
       setLoading(false);

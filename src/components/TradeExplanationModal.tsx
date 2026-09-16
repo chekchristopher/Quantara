@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle,
+  Clock,
   HelpCircle,
   Percent,
   Shield,
@@ -102,6 +103,25 @@ export const TradeExplanationModal: React.FC<TradeExplanationModalProps> = ({
             <span className="font-semibold text-[#10B981]">${takeProfit.toFixed(takeProfit > 10 ? 2 : 4)}</span>
           </div>
         </div>
+
+        {/* Position Taken Timestamp Pill if available */}
+        {(customData?.openedAt || customData?.entryTime || customData?.timestamp) && (
+          <div className="flex items-center justify-between text-xs bg-[#0E0E11] px-3 py-2 rounded-lg border border-[#1F1F23] font-mono">
+            <div className="flex items-center space-x-1.5 text-zinc-300">
+              <Clock className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+              <span className="text-[#8E9299]">Taken At:</span>
+              <span className="text-zinc-200 font-semibold">
+                {new Date(customData.openedAt || customData.entryTime || customData.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+              <span className="text-zinc-400">
+                {new Date(customData.openedAt || customData.entryTime || customData.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+            {customData?.strategyName && (
+              <span className="text-[#8E9299] text-[11px]">{customData.strategyName}</span>
+            )}
+          </div>
+        )}
 
         {/* AI Analysis Box */}
         {loading ? (

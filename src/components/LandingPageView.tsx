@@ -206,10 +206,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </p>
 
           {/* Primary Action Buttons */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm font-semibold">
+          <div className="pt-2 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm font-semibold max-w-xl sm:max-w-none mx-auto">
             <button
               onClick={() => onNavigateTab('dashboard')}
-              className="flex items-center space-x-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-xl shadow-blue-600/25 transition-all active:scale-[0.98] font-bold"
+              className="flex items-center justify-center space-x-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-xl shadow-blue-600/25 transition-all active:scale-[0.98] font-bold"
             >
               <Play className="h-4 w-4 fill-white" />
               <span>Launch Trading Terminal</span>
@@ -218,7 +218,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <button
               onClick={() => onNavigateTab('brokers')}
-              className="flex items-center space-x-2 px-5 py-3.5 rounded-xl border border-[#2B3142] bg-[#121520] hover:bg-[#1A1F30] hover:border-blue-500/40 text-zinc-200 transition-all active:scale-[0.98]"
+              className="flex items-center justify-center space-x-2 px-5 py-3.5 rounded-xl border border-[#2B3142] bg-[#121520] hover:bg-[#1A1F30] hover:border-blue-500/40 text-zinc-200 transition-all active:scale-[0.98]"
             >
               <Database className="h-4 w-4 text-blue-400" />
               <span>Connect MT5 Broker</span>
@@ -226,7 +226,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <button
               onClick={onOpenAuthModal}
-              className="flex items-center space-x-2 px-4 py-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition-all active:scale-[0.98]"
+              className="flex items-center justify-center space-x-2 px-4 py-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 transition-all active:scale-[0.98]"
             >
               <Lock className="h-4 w-4 text-emerald-400" />
               <span>{user ? 'Account Portal' : 'Operator Sign In / Gmail'}</span>
@@ -261,26 +261,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         {/* 3. Interactive Terminal Live Showcase Preview Card */}
         <div className="mt-10 sm:mt-14 max-w-5xl mx-auto rounded-2xl border border-[#242A3B] bg-[#0D1018] shadow-2xl overflow-hidden">
           {/* Header Bar of the Mock Terminal */}
-          <div className="flex flex-wrap items-center justify-between px-4 sm:px-6 py-3 border-b border-[#1A1F2C] bg-[#111520] gap-2">
-            <div className="flex items-center space-x-3">
-              <div className="flex space-x-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 border-b border-[#1A1F2C] bg-[#111520] gap-2.5">
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <div className="flex space-x-1.5 shrink-0">
                 <span className="h-3 w-3 rounded-full bg-red-500/80" />
                 <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
                 <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
               </div>
-              <div className="flex items-center space-x-2 text-xs font-mono text-zinc-300">
-                <Terminal className="h-3.5 w-3.5 text-blue-400" />
-                <span className="font-bold">quantara-terminal.live</span>
-                <span className="text-zinc-600">|</span>
-                <span className="text-emerald-400 text-[11px]">ACTIVE ENGINE ROUTE</span>
+              <div className="flex items-center space-x-2 text-xs font-mono text-zinc-300 truncate">
+                <Terminal className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <span className="font-bold truncate">quantara-terminal.live</span>
+                <span className="text-zinc-600 hidden xs:inline">|</span>
+                <span className="text-emerald-400 text-[11px] hidden xs:inline shrink-0">ACTIVE ENGINE ROUTE</span>
               </div>
             </div>
 
             {/* Terminal Switch Tabs */}
-            <div className="flex items-center space-x-1 rounded-lg bg-[#0A0D14] p-1 border border-[#1C2130] text-xs font-mono">
+            <div className="flex items-center space-x-1 rounded-lg bg-[#0A0D14] p-1 border border-[#1C2130] text-xs font-mono overflow-x-auto scrollbar-none w-full sm:w-auto shrink-0">
               <button
                 onClick={() => setActiveTabPreview('terminal')}
-                className={`px-3 py-1 rounded transition-all ${
+                className={`flex-1 sm:flex-initial text-center px-3 py-1 rounded transition-all whitespace-nowrap ${
                   activeTabPreview === 'terminal'
                     ? 'bg-blue-600 text-white font-bold shadow-sm'
                     : 'text-[#8E9299] hover:text-white'
@@ -290,7 +290,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </button>
               <button
                 onClick={() => setActiveTabPreview('risk')}
-                className={`px-3 py-1 rounded transition-all ${
+                className={`flex-1 sm:flex-initial text-center px-3 py-1 rounded transition-all whitespace-nowrap ${
                   activeTabPreview === 'risk'
                     ? 'bg-blue-600 text-white font-bold shadow-sm'
                     : 'text-[#8E9299] hover:text-white'
@@ -300,7 +300,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </button>
               <button
                 onClick={() => setActiveTabPreview('compounding')}
-                className={`px-3 py-1 rounded transition-all ${
+                className={`flex-1 sm:flex-initial text-center px-3 py-1 rounded transition-all whitespace-nowrap ${
                   activeTabPreview === 'compounding'
                     ? 'bg-blue-600 text-white font-bold shadow-sm'
                     : 'text-[#8E9299] hover:text-white'
@@ -347,11 +347,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
                 {/* Simulated Order Execution Matrix */}
                 <div className="rounded-xl border border-[#1E2435] bg-[#0E121B] p-4 font-mono text-xs overflow-x-auto">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#1A2030] text-[11px] text-[#787E92]">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#1A2030] text-[11px] text-[#787E92] min-w-[540px]">
                     <span>REAL-TIME EXECUTION LOGS</span>
                     <span className="text-emerald-400">AUTONOMOUS TAKE-OVER ACTIVE</span>
                   </div>
-                  <div className="mt-3 space-y-2 text-[11px]">
+                  <div className="mt-3 space-y-2 text-[11px] min-w-[540px]">
                     <div className="flex items-center justify-between text-zinc-300 bg-[#121624] px-3 py-1.5 rounded">
                       <span className="text-emerald-400 font-bold">[EXEC] BUY XAU/USD</span>
                       <span>Lot: 1.50 @ 2652.10</span>
@@ -698,7 +698,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
 
         <div className="rounded-2xl border border-[#202534] bg-[#0E121B] overflow-x-auto shadow-xl">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
+          <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[620px]">
             <thead>
               <tr className="border-b border-[#1E2332] bg-[#121622] font-mono text-zinc-400 text-xs">
                 <th className="p-4 sm:px-6">Execution Feature</th>
@@ -814,10 +814,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           activate your desired strategies, and let Quantara manage execution with precision.
         </p>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs sm:text-sm font-semibold">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-2 text-xs sm:text-sm font-semibold max-w-md sm:max-w-none mx-auto">
           <button
             onClick={() => onNavigateTab('dashboard')}
-            className="flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98]"
+            className="flex items-center justify-center space-x-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98]"
           >
             <span>Open Quantara Terminal</span>
             <ArrowRight className="h-4 w-4" />
@@ -825,7 +825,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
           <button
             onClick={() => onNavigateTab('workbook')}
-            className="flex items-center space-x-2 px-5 py-3 rounded-xl border border-[#2B3142] bg-[#121624] hover:bg-[#1A2032] text-zinc-200 transition-all active:scale-[0.98]"
+            className="flex items-center justify-center space-x-2 px-5 py-3.5 rounded-xl border border-[#2B3142] bg-[#121624] hover:bg-[#1A2032] text-zinc-200 transition-all active:scale-[0.98]"
           >
             <BookOpen className="h-4 w-4 text-blue-400" />
             <span>Read Operator Workbook</span>

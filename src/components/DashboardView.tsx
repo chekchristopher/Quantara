@@ -5,8 +5,10 @@ import {
   ArrowUpRight,
   BarChart2,
   BookOpen,
+  Calendar,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Coins,
   Compass,
   Cpu,
@@ -1202,6 +1204,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="md:hidden space-y-3">
               {positions.map((pos) => {
                 const isProfit = pos.unrealizedPnl >= 0;
+                const openedDate = new Date(pos.openedAt || Date.now());
+                const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 return (
                   <div
                     key={pos.id}
@@ -1234,6 +1239,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           ({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)
                         </span>
                       </div>
+                    </div>
+
+                    {/* Time & Date Opened Badge */}
+                    <div className="flex items-center justify-between text-[11px] bg-[#141418] px-2.5 py-1.5 rounded-lg border border-[#1F1F23]">
+                      <div className="flex items-center space-x-1.5 text-zinc-300">
+                        <Clock className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                        <span className="text-[#8E9299] text-[10px]">Position Taken:</span>
+                        <span className="font-semibold text-zinc-200">{dateStr}</span>
+                        <span className="text-[#8E9299] text-[10px]">{timeStr}</span>
+                      </div>
+                      <span className="text-[10px] text-blue-400 font-semibold">
+                        #{pos.id.replace('pos_', '').slice(-7)}
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#141416] p-2.5 border border-[#1F1F23] text-[11px]">
@@ -1277,11 +1295,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Desktop Full Data Table (hidden md:block) */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-xs font-mono min-w-[840px]">
                 <thead>
                   <tr className="border-b border-[#1F1F23] text-[#8E9299] uppercase text-[10px]">
                     <th className="py-2.5 px-3">Asset</th>
                     <th className="py-2.5 px-3">Side</th>
+                    <th className="py-2.5 px-3">Time / Date</th>
                     <th className="py-2.5 px-3">Size / Value</th>
                     <th className="py-2.5 px-3">Entry Price</th>
                     <th className="py-2.5 px-3">Current Price</th>
@@ -1295,6 +1314,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <tbody className="divide-y divide-[#1F1F23]">
                   {positions.map((pos) => {
                     const isProfit = pos.unrealizedPnl >= 0;
+                    const openedDate = new Date(pos.openedAt || Date.now());
+                    const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                    const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     return (
                       <tr key={pos.id} className="hover:bg-[#1F1F23]/30 transition-colors">
                         <td className="py-3 px-3 font-bold text-white">
@@ -1313,6 +1335,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           >
                             {pos.side}
                           </span>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap font-mono">
+                          <div className="text-zinc-200 text-xs font-semibold flex items-center space-x-1">
+                            <Calendar className="h-3 w-3 text-zinc-500 shrink-0" />
+                            <span>{dateStr}</span>
+                          </div>
+                          <div className="text-[10px] text-[#8E9299] flex items-center space-x-1 mt-0.5">
+                            <Clock className="h-2.5 w-2.5 text-blue-400 shrink-0" />
+                            <span>{timeStr}</span>
+                          </div>
                         </td>
                         <td className="py-3 px-3 text-[#E4E4E7]">
                           {pos.size >= 10000 ? `${(pos.size / 100000).toFixed(2)} Lots` : pos.size}{' '}
