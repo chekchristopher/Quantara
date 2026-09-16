@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Shield,
   Sliders,
+  Sparkles,
   TrendingUp,
   User,
   X,
@@ -71,6 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const navItems = [
+    { id: 'landing', label: 'Platform Overview', icon: Sparkles },
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
     { id: 'workbook', label: 'User Workbook', icon: BookOpen },
     { id: 'compounding', label: '$10 Wealth Engine', icon: TrendingUp },
@@ -95,11 +97,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-[#1F1F23] text-xs">
           {/* Brand */}
           <div className="flex items-center space-x-2.5 sm:space-x-4">
-            <div className="flex items-center space-x-2.5 sm:space-x-3.5">
+            <button
+              onClick={() => onSelectTab(currentTab === 'landing' ? 'dashboard' : 'landing')}
+              className="flex items-center space-x-2.5 sm:space-x-3.5 text-left group transition-opacity hover:opacity-90 cursor-pointer"
+              title="Click to toggle between Platform Overview and Live Terminal"
+            >
               <QuantaraLogoMark size="sm" />
               <div>
                 <div className="flex items-center space-x-1.5 sm:space-x-2.5">
-                  <span className="font-brand text-base sm:text-lg font-extrabold tracking-[0.18em] sm:tracking-[0.2em] text-white flex items-center leading-none select-none">
+                  <span className="font-brand text-base sm:text-lg font-extrabold tracking-[0.18em] sm:tracking-[0.2em] text-white flex items-center leading-none select-none group-hover:text-blue-300 transition-colors">
                     QUANT<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500">ARA</span>
                   </span>
                   <span className="hidden xs:inline-flex rounded border border-blue-500/25 bg-blue-500/10 px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-tech font-bold uppercase tracking-wider text-blue-400 leading-none">
@@ -112,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Automated Execution</span>
                 </p>
               </div>
-            </div>
+            </button>
 
             {/* Desktop Engine Status */}
             <div className="hidden lg:flex items-center pl-4 border-l border-[#1F1F23] space-x-3">

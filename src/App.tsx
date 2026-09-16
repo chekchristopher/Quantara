@@ -13,6 +13,7 @@ import { AdminDashboardView } from './components/AdminDashboardView';
 import { TradeExplanationModal } from './components/TradeExplanationModal';
 import { LiveTradingConfirmationModal } from './components/LiveTradingConfirmationModal';
 import { EnterpriseAuthModal } from './components/EnterpriseAuthModal';
+import { LandingPageView } from './components/LandingPageView';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { firestoreSync } from './services/firestoreSync';
 import { QuantaraLogoMark } from './components/QuantaraLogo';
@@ -35,7 +36,7 @@ import {
 
 function QuantaraApp() {
   const { user, profile, cloudSyncStatus } = useAuth();
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [currentTab, setCurrentTab] = useState<string>('landing');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // Core Application State
@@ -454,6 +455,13 @@ function QuantaraApp() {
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-24 md:pb-8 space-y-6">
+        {currentTab === 'landing' && (
+          <LandingPageView
+            onNavigateTab={setCurrentTab}
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          />
+        )}
+
         {currentTab === 'dashboard' && (
           <DashboardView
             portfolio={portfolio}
