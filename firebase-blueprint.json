@@ -59,6 +59,10 @@
         "currency": { "type": "string", "maxLength": 16 },
         "leverage": { "type": "number" },
         "isCompoundingActive": { "type": "boolean" },
+        "serverStatus": { "type": "string", "maxLength": 32 },
+        "isNonStop": { "type": "boolean" },
+        "savedInSystem": { "type": "boolean" },
+        "uptimeSeconds": { "type": "number" },
         "createdAt": { "type": "string", "maxLength": 64 },
         "updatedAt": { "type": "string", "maxLength": 64 }
       },

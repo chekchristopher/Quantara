@@ -4,6 +4,7 @@ import { RiskValidationResult } from './riskEngine';
 
 export class ExecutionEngine {
   private processedIdempotencyKeys: Set<string> = new Set();
+  public onTradeClosed?: (closedItem: TradeHistoryItem) => void;
 
   /**
    * Executes an order derived from a validated signal.
@@ -116,6 +117,10 @@ export class ExecutionEngine {
       'info'
     );
 
+    // Persist 24/7 continuous state
+    db.persistAccounts();
+    db.persistEngineState();
+
     return { success: true, position, order, message: 'Position executed and verified successfully' };
   }
 
@@ -185,6 +190,25 @@ export class ExecutionEngine {
     db.tradesHistory.unshift(closedItem);
     db.positions.splice(posIndex, 1);
     db.portfolio.activePositionsCount = db.positions.length;
+
+    // Update active connected server / broker stats
+    const activeAcc = db.brokerAccounts.find((a) => a.id === db.botState.activeBrokerAccountId || a.isActiveForTakeover) || db.brokerAccounts[0];
+    if (activeAcc) {
+      activeAcc.simulatedBalance = Number((db.portfolio.cashBalance).toFixed(2));
+      activeAcc.equity = Number((db.portfolio.totalEquity).toFixed(2));
+      activeAcc.tradesCount = (activeAcc.tradesCount || 0) + 1;
+      activeAcc.pnlRealized = Number(((activeAcc.pnlRealized || 0) + finalRealizedPnl).toFixed(2));
+      activeAcc.lastExecutionTick = Date.now();
+    }
+
+    // Trigger offline wealth record callback if user is offline
+    if (this.onTradeClosed) {
+      this.onTradeClosed(closedItem);
+    }
+
+    // Persist 24/7 continuous state
+    db.persistAccounts();
+    db.persistEngineState();
 
     const notifType = exitReason === 'TAKE_PROFIT' ? 'TAKE_PROFIT' : exitReason === 'STOP_LOSS' ? 'STOP_LOSS' : 'TRADE_CLOSE';
     const severity = finalRealizedPnl >= 0 ? 'success' : 'warning';

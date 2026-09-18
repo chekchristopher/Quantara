@@ -179,6 +179,7 @@ export interface TradeHistoryItem {
   realizedPnlPercent: number;
   feesPaid: number;
   strategyName: string;
+  accountName?: string;
   entryTime: number;
   exitTime: number;
   exitReason: 'TAKE_PROFIT' | 'STOP_LOSS' | 'TRAILING_STOP' | 'KILL_SWITCH' | 'MANUAL' | 'SIGNAL_REVERSAL';
@@ -224,6 +225,40 @@ export interface BotState {
   initialSeedCapital: number;
   microAccountTarget: number;
   asymmetricFilterEnabled: boolean;
+  serverEngineStatus?: 'RUNNING' | 'PAUSED' | 'STOPPED';
+  serverUptimeSeconds?: number;
+  isNonStopLoop?: boolean;
+  offlineSessionStats?: OfflineSessionStats;
+}
+
+export interface OfflineTradeRecord {
+  id: string;
+  symbol: string;
+  side: PositionSide;
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  realizedPnl: number;
+  realizedPnlPercent: number;
+  exitReason: string;
+  exitTime: number;
+  strategyName: string;
+  accountName?: string;
+}
+
+export interface OfflineSessionStats {
+  hasUnseenReport: boolean;
+  wentOfflineAt: number;
+  returnedAt: number;
+  offlineDurationSeconds: number;
+  tradesExecutedOffline: number;
+  realizedPnlOffline: number;
+  winningTradesOffline: number;
+  losingTradesOffline: number;
+  startingBalance: number;
+  endingBalance: number;
+  trades: OfflineTradeRecord[];
+  activeServerAccounts: string[];
 }
 
 export interface CompoundingMilestone {
@@ -271,6 +306,14 @@ export interface BrokerAccount {
   lastConnected: number;
   isActiveForTakeover?: boolean;
   autoTradeControl?: MT5TradeControlConfig;
+  serverStatus?: 'RUNNING' | 'PAUSED' | 'STOPPED';
+  isNonStop?: boolean;
+  savedInSystem?: boolean;
+  connectedAt?: number;
+  uptimeSeconds?: number;
+  lastExecutionTick?: number;
+  tradesCount?: number;
+  pnlRealized?: number;
 }
 
 export interface NotificationItem {

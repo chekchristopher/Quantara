@@ -213,6 +213,13 @@ export const firestoreSync = {
       apiKeyMasked: broker.apiKeyMasked || '••••••••',
       permissions: broker.permissions || ['TRADE', 'READ'],
       lastConnected: broker.lastConnected || Date.now(),
+      serverStatus: broker.serverStatus || 'RUNNING',
+      isNonStop: broker.isNonStop !== false,
+      savedInSystem: true,
+      uptimeSeconds: broker.uptimeSeconds ?? 0,
+      connectedAt: broker.connectedAt || broker.lastConnected || Date.now(),
+      tradesCount: broker.tradesCount ?? 0,
+      pnlRealized: broker.pnlRealized ?? 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -261,6 +268,13 @@ export const firestoreSync = {
             equity: d.equity ?? 0,
             isPaper: d.isPaper ?? true,
             lastConnected: d.lastConnected || Date.now(),
+            serverStatus: d.serverStatus || 'RUNNING',
+            isNonStop: d.isNonStop !== false,
+            savedInSystem: true,
+            uptimeSeconds: d.uptimeSeconds ?? 0,
+            connectedAt: d.connectedAt || d.lastConnected || Date.now(),
+            tradesCount: d.tradesCount ?? 0,
+            pnlRealized: d.pnlRealized ?? 0,
           });
         });
         onUpdate(brokers);

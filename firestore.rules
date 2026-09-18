@@ -93,6 +93,13 @@ service cloud.firestore {
         (!('apiKeyMasked' in data) || (data.apiKeyMasked is string && data.apiKeyMasked.size() <= 64)) &&
         (!('permissions' in data) || data.permissions is list) &&
         (!('lastConnected' in data) || data.lastConnected is number) &&
+        (!('serverStatus' in data) || (data.serverStatus is string && data.serverStatus.size() <= 32)) &&
+        (!('isNonStop' in data) || data.isNonStop is bool) &&
+        (!('savedInSystem' in data) || data.savedInSystem is bool) &&
+        (!('uptimeSeconds' in data) || data.uptimeSeconds is number) &&
+        (!('connectedAt' in data) || data.connectedAt is number) &&
+        (!('tradesCount' in data) || data.tradesCount is number) &&
+        (!('pnlRealized' in data) || data.pnlRealized is number) &&
         data.createdAt is string && data.createdAt.size() <= 64 &&
         data.updatedAt is string && data.updatedAt.size() <= 64;
     }

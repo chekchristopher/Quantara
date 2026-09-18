@@ -549,6 +549,13 @@ app.post('/api/brokers/mt5/login', (req, res) => {
     isPaper: accountType !== 'REAL',
     lastConnected: Date.now(),
     isActiveForTakeover: true,
+    serverStatus: 'RUNNING',
+    isNonStop: true,
+    savedInSystem: true,
+    connectedAt: Date.now(),
+    uptimeSeconds: 0,
+    tradesCount: 0,
+    pnlRealized: 0,
     autoTradeControl: autoTradeControl || {
       autoTradeEnabled: true,
       prioritizeGold: true,
@@ -567,8 +574,9 @@ app.post('/api/brokers/mt5/login', (req, res) => {
     b.isActiveForTakeover = false;
   });
 
-  // Prepend new account to list
+  // Prepend new account to list and persist to disk
   db.brokerAccounts.unshift(newAccount);
+  db.persistAccounts();
 
   // Synchronize Bot state & Portfolio
   db.botState.activeBrokerAccountId = newAccount.id;
@@ -577,6 +585,8 @@ app.post('/api/brokers/mt5/login', (req, res) => {
   db.botState.autonomousTakeover = Boolean(newAccount.autoTradeControl?.autoTradeEnabled ?? true);
   db.botState.isRunning = true;
   db.botState.status = 'ONLINE';
+  db.botState.serverEngineStatus = 'RUNNING';
+  db.botState.isNonStopLoop = true;
 
   // Synchronize Portfolio capital to user's real broker capital
   db.portfolio.cashBalance = numBalance;
@@ -656,9 +666,17 @@ app.post('/api/brokers/connect', (req, res) => {
     pingMs: Math.floor(10 + Math.random() * 15),
     isPaper: Boolean(isPaper),
     lastConnected: Date.now(),
+    serverStatus: 'RUNNING',
+    isNonStop: true,
+    savedInSystem: true,
+    connectedAt: Date.now(),
+    uptimeSeconds: 0,
+    tradesCount: 0,
+    pnlRealized: 0,
   };
 
   db.brokerAccounts.push(newAccount);
+  db.persistAccounts();
   db.addAuditLog('BROKER', 'BROKER_ACCOUNT_LINKED', `Linked ${broker} (${newAccount.accountNumber}) as "${assignedName}" in ${isPaper ? 'PAPER' : 'LIVE'} mode.`);
   db.addNotification('SYSTEM', 'Broker Account Linked', `Successfully connected ${assignedName} with trading permissions.`, 'success');
   tradingEngine.broadcastState();
@@ -684,6 +702,8 @@ app.post('/api/brokers/:id/rename', (req, res) => {
   if (db.botState.activeBrokerAccountId === id) {
     db.botState.activeBrokerAccountName = trimmedName;
   }
+
+  db.persistAccounts();
 
   db.addAuditLog(
     'BROKER',
@@ -717,6 +737,17 @@ app.post('/api/brokers/select-active', (req, res) => {
   db.botState.activeBrokerAccountName = target.name;
   db.botState.environment = target.isPaper ? 'paper' : 'live';
 
+  if (target.serverStatus !== 'STOPPED') {
+    db.botState.isRunning = target.serverStatus === 'RUNNING';
+    db.botState.status = target.serverStatus === 'RUNNING' ? 'ONLINE' : 'PAUSED';
+    db.botState.serverEngineStatus = target.serverStatus;
+    db.botState.isNonStopLoop = true;
+  } else {
+    db.botState.isRunning = false;
+    db.botState.status = 'STOPPED';
+    db.botState.serverEngineStatus = 'STOPPED';
+  }
+
   if (target.isPaper && target.simulatedBalance > 0) {
     db.portfolio.cashBalance = target.simulatedBalance;
     db.portfolio.totalEquity = target.simulatedBalance;
@@ -724,20 +755,183 @@ app.post('/api/brokers/select-active', (req, res) => {
     db.botState.initialSeedCapital = target.simulatedBalance;
   }
 
+  db.persistAccounts();
   db.addAuditLog('BROKER', 'ACTIVE_BROKER_SELECTED', `Assigned ${target.name} (${target.accountNumber}) as active autonomous execution target.`, 'INFO');
   db.addNotification('SYSTEM', 'Active Account Assigned', `Quantara will execute automated trades directly on ${target.name}.`, 'success');
   tradingEngine.broadcastState();
   res.json({ success: true, activeAccount: target, botState: db.botState });
 });
 
+app.post('/api/brokers/:id/pause-server', (req, res) => {
+  const { id } = req.params;
+  const target = db.brokerAccounts.find((b) => b.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'Account not found' });
+
+  target.serverStatus = 'PAUSED';
+  target.status = 'CONNECTED';
+  if (db.botState.activeBrokerAccountId === id) {
+    db.botState.isRunning = false;
+    db.botState.status = 'PAUSED';
+    db.botState.serverEngineStatus = 'PAUSED';
+  }
+
+  db.persistAccounts();
+  db.addAuditLog('SYSTEM', 'SERVER_PAUSED', `Server paused for account ${target.name} (#${target.accountNumber}). Existing positions monitored.`, 'WARN');
+  db.addNotification('SYSTEM', 'Server Engine Paused', `Autonomous execution paused for ${target.name}.`, 'warning');
+  tradingEngine.broadcastState();
+  res.json({ success: true, account: target, botState: db.botState });
+});
+
+app.post('/api/brokers/:id/resume-server', (req, res) => {
+  const { id } = req.params;
+  const target = db.brokerAccounts.find((b) => b.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'Account not found' });
+
+  target.serverStatus = 'RUNNING';
+  target.isNonStop = true;
+  target.status = 'CONNECTED';
+  if (db.botState.activeBrokerAccountId === id) {
+    db.botState.isRunning = true;
+    db.botState.status = 'ONLINE';
+    db.botState.serverEngineStatus = 'RUNNING';
+    db.botState.isNonStopLoop = true;
+  }
+
+  db.persistAccounts();
+  db.addAuditLog('SYSTEM', 'SERVER_RESUMED', `Server execution resumed non-stop 24/7 for account ${target.name} (#${target.accountNumber}).`, 'INFO');
+  db.addNotification('SYSTEM', 'Server Engine Running Non-Stop', `24/7 execution resumed for ${target.name}.`, 'success');
+  tradingEngine.broadcastState();
+  res.json({ success: true, account: target, botState: db.botState });
+});
+
+app.post('/api/brokers/:id/stop-server', (req, res) => {
+  const { id } = req.params;
+  const target = db.brokerAccounts.find((b) => b.id === id);
+  if (!target) return res.status(404).json({ success: false, message: 'Account not found' });
+
+  target.serverStatus = 'STOPPED';
+  target.status = 'DISCONNECTED';
+  if (db.botState.activeBrokerAccountId === id) {
+    db.botState.isRunning = false;
+    db.botState.status = 'STOPPED';
+    db.botState.serverEngineStatus = 'STOPPED';
+  }
+
+  db.persistAccounts();
+  db.addAuditLog('SYSTEM', 'SERVER_STOPPED', `Server loop stopped for account ${target.name} (#${target.accountNumber}).`, 'WARN');
+  db.addNotification('SYSTEM', 'Server Stopped', `Execution stopped on ${target.name}.`, 'warning');
+  tradingEngine.broadcastState();
+  res.json({ success: true, account: target, botState: db.botState });
+});
+
+app.post('/api/brokers/server/pause-all', (req, res) => {
+  db.brokerAccounts.forEach((acc) => {
+    acc.serverStatus = 'PAUSED';
+  });
+  tradingEngine.pause();
+  res.json({ success: true, botState: db.botState, brokerAccounts: db.brokerAccounts });
+});
+
+app.post('/api/brokers/server/run-all', (req, res) => {
+  db.brokerAccounts.forEach((acc) => {
+    acc.serverStatus = 'RUNNING';
+    acc.isNonStop = true;
+  });
+  tradingEngine.resume();
+  res.json({ success: true, botState: db.botState, brokerAccounts: db.brokerAccounts });
+});
+
+app.post('/api/brokers/sync', (req, res) => {
+  const { accounts } = req.body;
+  if (Array.isArray(accounts) && accounts.length > 0) {
+    let addedCount = 0;
+    for (const incoming of accounts) {
+      if (!incoming || !incoming.accountNumber) continue;
+      const existing = db.brokerAccounts.find(
+        (b) => b.id === incoming.id || (b.accountNumber === incoming.accountNumber && b.server === incoming.server)
+      );
+      if (existing) {
+        // Merge attributes while preserving status if running
+        if (incoming.name) existing.name = incoming.name;
+        if (incoming.simulatedBalance) existing.simulatedBalance = incoming.simulatedBalance;
+        if (!existing.serverStatus) existing.serverStatus = 'RUNNING';
+        existing.isNonStop = true;
+        existing.savedInSystem = true;
+      } else {
+        const normalized: any = {
+          ...incoming,
+          id: incoming.id || `acc_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          serverStatus: incoming.serverStatus || 'RUNNING',
+          isNonStop: true,
+          savedInSystem: true,
+          connectedAt: incoming.connectedAt || Date.now(),
+          uptimeSeconds: incoming.uptimeSeconds || 0,
+        };
+        db.brokerAccounts.push(normalized);
+        addedCount++;
+      }
+    }
+
+    if (addedCount > 0) {
+      db.persistAccounts();
+      if (!db.botState.activeBrokerAccountId && db.brokerAccounts.length > 0) {
+        const first = db.brokerAccounts[0];
+        first.isActiveForTakeover = true;
+        db.botState.activeBrokerAccountId = first.id;
+        db.botState.activeBrokerAccountName = first.name;
+        db.botState.environment = first.isPaper ? 'paper' : 'live';
+        db.botState.isRunning = true;
+        db.botState.status = 'ONLINE';
+        db.botState.serverEngineStatus = 'RUNNING';
+        db.botState.isNonStopLoop = true;
+      }
+      db.addAuditLog('SYSTEM', 'ACCOUNTS_SYNCED', `Synchronized ${addedCount} account(s) into persistent system store.`, 'INFO');
+      tradingEngine.broadcastState();
+    }
+  }
+
+  res.json({ success: true, accounts: db.brokerAccounts, botState: db.botState });
+});
+
 app.delete('/api/brokers/:id', (req, res) => {
-  const idx = db.brokerAccounts.findIndex((b) => b.id === req.params.id);
+  const { id } = req.params;
+  const idx = db.brokerAccounts.findIndex((b) => b.id === id);
   if (idx !== -1) {
     const removed = db.brokerAccounts.splice(idx, 1)[0];
-    db.addAuditLog('BROKER', 'BROKER_ACCOUNT_DISCONNECTED', `Disconnected ${removed.broker} (${removed.accountNumber})`);
+    db.persistAccounts();
+    db.addAuditLog('BROKER', 'BROKER_ACCOUNT_DELETED', `Permanently deleted server instance and removed ${removed.broker} (${removed.accountNumber}) from system.`);
+    db.addNotification('SYSTEM', 'Server Deleted', `Account #${removed.accountNumber} deleted and removed from system storage.`, 'warning');
+
+    // If removed account was the active takeover target, select next available account
+    if (db.botState.activeBrokerAccountId === id) {
+      if (db.brokerAccounts.length > 0) {
+        const next = db.brokerAccounts[0];
+        next.isActiveForTakeover = true;
+        db.botState.activeBrokerAccountId = next.id;
+        db.botState.activeBrokerAccountName = next.name;
+        db.botState.environment = next.isPaper ? 'paper' : 'live';
+        if (next.serverStatus !== 'STOPPED') {
+          db.botState.isRunning = next.serverStatus === 'RUNNING';
+          db.botState.status = next.serverStatus === 'RUNNING' ? 'ONLINE' : 'PAUSED';
+          db.botState.serverEngineStatus = next.serverStatus;
+          db.botState.isNonStopLoop = true;
+        } else {
+          db.botState.isRunning = false;
+          db.botState.status = 'STOPPED';
+          db.botState.serverEngineStatus = 'STOPPED';
+        }
+      } else {
+        db.botState.activeBrokerAccountId = undefined;
+        db.botState.activeBrokerAccountName = undefined;
+        db.botState.isRunning = false;
+        db.botState.status = 'AWAITING_BROKER_CONNECTION';
+        db.botState.serverEngineStatus = 'STOPPED';
+        db.botState.isNonStopLoop = false;
+      }
+    }
   }
   tradingEngine.broadcastState();
-  res.json({ success: true });
+  res.json({ success: true, brokerAccounts: db.brokerAccounts, botState: db.botState });
 });
 
 // -----------------------------------------------------------------------------
@@ -771,6 +965,24 @@ app.post('/api/auth/settings', (req, res) => {
   if (name) db.user.name = name;
   if (preferences) db.user.preferences = { ...db.user.preferences, ...preferences };
   res.json({ success: true, user: db.user });
+});
+
+// -----------------------------------------------------------------------------
+// 10.1 24/7 Offline Wealth Engine Report API
+// -----------------------------------------------------------------------------
+app.get('/api/offline-report', (req, res) => {
+  res.json({
+    success: true,
+    offlineReport: db.offlineSessionStats || null,
+    isEngineRunning: db.botState.isRunning,
+    serverAccountsCount: db.brokerAccounts.length,
+  });
+});
+
+app.post('/api/offline-report/dismiss', (req, res) => {
+  tradingEngine.dismissOfflineReport();
+  tradingEngine.broadcastState();
+  res.json({ success: true });
 });
 
 // -----------------------------------------------------------------------------

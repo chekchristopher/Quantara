@@ -35,6 +35,7 @@ import {
   ShieldCheck,
   Sliders,
   Sparkles,
+  Square,
   Tag,
   Terminal,
   Trash2,
@@ -63,6 +64,11 @@ interface AccountBrokerViewProps {
   onSelectActiveBroker?: (accountId: string) => Promise<any>;
   onRenameBroker?: (id: string, name: string) => Promise<any>;
   onToggleTakeover?: () => Promise<any>;
+  onPauseServer?: (id: string) => Promise<any>;
+  onResumeServer?: (id: string) => Promise<any>;
+  onStopServer?: (id: string) => Promise<any>;
+  onPauseAllServers?: () => Promise<any>;
+  onRunAllServers?: () => Promise<any>;
 }
 
 export const RANDOM_ACCOUNT_NAMES = [
@@ -284,6 +290,11 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   onSelectActiveBroker,
   onRenameBroker,
   onToggleTakeover,
+  onPauseServer,
+  onResumeServer,
+  onStopServer,
+  onPauseAllServers,
+  onRunAllServers,
 }) => {
   const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal'>(
     brokerAccounts.length === 0 ? 'login' : 'control'
@@ -292,6 +303,27 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Server management & delete confirmation state
+  const [serverActionLoadingId, setServerActionLoadingId] = useState<string | null>(null);
+  const [serverToDelete, setServerToDelete] = useState<BrokerAccount | null>(null);
+  const [isDeletingServer, setIsDeletingServer] = useState(false);
+
+  const formatServerUptime = (seconds?: number, connectedAt?: number) => {
+    let sec = seconds || 0;
+    if (!sec && connectedAt) {
+      sec = Math.max(0, Math.floor((Date.now() - connectedAt) / 1000));
+    }
+    if (sec <= 0) return 'Running non-stop';
+    const days = Math.floor(sec / 86400);
+    const hours = Math.floor((sec % 86400) / 3600);
+    const minutes = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${s}s`;
+    if (minutes > 0) return `${minutes}m ${s}s`;
+    return `${s}s`;
+  };
 
   // MT5 Login Form State
   const [selectedPreset, setSelectedPreset] = useState<BrokerPreset>(BROKER_PRESETS[0]);
@@ -556,7 +588,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
         <div className="flex items-center space-x-1 bg-[#141416] p-1 rounded-lg border border-[#1F1F23] overflow-x-auto scrollbar-none max-w-full shrink-0">
           <button
             onClick={() => setActiveTab('control')}
-            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
               activeTab === 'control'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-[#8E9299] hover:text-white'
@@ -567,7 +599,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('login')}
-            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
               activeTab === 'login'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-[#8E9299] hover:text-white'
@@ -578,7 +610,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('accounts')}
-            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
               activeTab === 'accounts'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-[#8E9299] hover:text-white'
@@ -589,7 +621,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('journal')}
-            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
               activeTab === 'journal'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-[#8E9299] hover:text-white'
@@ -873,11 +905,11 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
 
       {/* TAB 1: Autonomous Trade Control Panel */}
       {activeTab === 'control' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 min-w-0">
           {/* Left 2 Cols: Autonomous Sizing & Rule Controls */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 min-w-0 space-y-4 sm:space-y-5">
             {/* Autonomous Execution Mode Overview */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4 shadow-xl">
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3.5 sm:p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
                 <div className="flex items-center space-x-2">
                   <ShieldCheck className="h-4 w-4 text-blue-400" />
@@ -1284,9 +1316,9 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           </div>
 
           {/* Right Col: Instant One-Click Manual Override & Live Terminal Telemetry */}
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-4 sm:space-y-5">
             {/* Instant One-Click MT5 Order Execution */}
-            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4 shadow-xl">
+            <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3.5 sm:p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
                 <span className="font-tech text-xs font-bold uppercase tracking-wider text-white flex items-center">
                   <Zap className="h-3.5 w-3.5 text-yellow-400 mr-1.5" />
@@ -1967,30 +1999,96 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
         </div>
       )}
 
-      {/* TAB 3: All Connected Broker Accounts Grid */}
+      {/* TAB 3: All Connected Broker Accounts Grid & 24/7 Non-Stop Server Manager */}
       {activeTab === 'accounts' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#8E9299]">
-              Manage linked broker accounts and switch active execution targets
-            </span>
-            <button
-              onClick={() => setActiveTab('login')}
-              className="rounded-lg bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 font-semibold text-white text-xs flex items-center space-x-1.5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Link Another MT5 Account</span>
-            </button>
+          {/* Top Explanatory Banner & Batch Controls */}
+          <div className="rounded-xl border border-blue-500/30 bg-[#0E111A] p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-blue-500/5">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <h3 className="font-tech text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                  Persistent Connected Accounts & 24/7 Non-Stop Trading Servers
+                </h3>
+              </div>
+              <p className="text-xs text-[#8E9299] max-w-2xl leading-relaxed">
+                All connected Demo and Real accounts are saved directly in the system database and persistent disk storage. They execute autonomous trading algorithms <strong className="text-white">non-stop 24/7</strong> in the background, even when you close your browser or restart the application, unless you explicitly <strong className="text-yellow-400">Pause</strong>, <strong className="text-red-400">Stop</strong>, or <strong className="text-red-500">Delete</strong> the server.
+              </p>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {onRunAllServers && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setServerActionLoadingId('all-run');
+                    try {
+                      await onRunAllServers();
+                      setFeedbackMessage({ text: 'All connected servers resumed non-stop 24/7 execution.', type: 'success' });
+                    } catch (e: any) {
+                      setFeedbackMessage({ text: e.message || 'Failed to start servers', type: 'error' });
+                    } finally {
+                      setServerActionLoadingId(null);
+                    }
+                  }}
+                  disabled={serverActionLoadingId === 'all-run'}
+                  className="rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 px-3 py-2 text-xs font-mono font-bold text-emerald-300 transition-colors flex items-center space-x-1.5"
+                  title="Run all connected servers non-stop 24/7"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  <span>Run All Non-Stop</span>
+                </button>
+              )}
+
+              {onPauseAllServers && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setServerActionLoadingId('all-pause');
+                    try {
+                      await onPauseAllServers();
+                      setFeedbackMessage({ text: 'All connected servers paused.', type: 'info' });
+                    } catch (e: any) {
+                      setFeedbackMessage({ text: e.message || 'Failed to pause servers', type: 'error' });
+                    } finally {
+                      setServerActionLoadingId(null);
+                    }
+                  }}
+                  disabled={serverActionLoadingId === 'all-pause'}
+                  className="rounded-lg bg-yellow-500/15 hover:bg-yellow-500/25 border border-yellow-500/30 px-3 py-2 text-xs font-mono font-bold text-yellow-300 transition-colors flex items-center space-x-1.5"
+                  title="Pause all connected servers"
+                >
+                  <Pause className="h-3.5 w-3.5" />
+                  <span>Pause All</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('login')}
+                className="rounded-lg bg-blue-600 hover:bg-blue-500 px-3.5 py-2 font-semibold text-white text-xs flex items-center space-x-1.5 shadow-md shadow-blue-600/20 transition-all"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Link Another MT5</span>
+              </button>
+            </div>
           </div>
 
+          {/* Accounts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {brokerAccounts.map((acc) => {
               const isActiveTarget = acc.id === activeBrokerAccountId || acc.isActiveForTakeover;
+              const serverStatus = acc.serverStatus || 'RUNNING';
+              const isRunning = serverStatus === 'RUNNING';
+              const isPaused = serverStatus === 'PAUSED';
+              const isStopped = serverStatus === 'STOPPED';
+              const isLoadingCurrent = serverActionLoadingId === acc.id;
 
               return (
                 <div
                   key={acc.id}
-                  className={`rounded-xl border p-5 space-y-3 relative overflow-hidden transition-all ${
+                  className={`rounded-xl border p-4 sm:p-5 space-y-3 relative overflow-hidden transition-all ${
                     isActiveTarget
                       ? 'border-blue-500/80 bg-[#141416] shadow-xl shadow-blue-500/10'
                       : 'border-[#1F1F23] bg-[#141416]/70 hover:border-zinc-700'
@@ -2000,6 +2098,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                     <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-blue-500 to-[#10B981]" />
                   )}
 
+                  {/* Header: Name and badges */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       {editingAccountId === acc.id ? (
@@ -2072,7 +2171,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                             : 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20'
                         }`}
                       >
-                        {acc.isPaper ? 'PROVING RUN' : 'LIVE PRODUCTION'}
+                        {acc.isPaper ? 'DEMO / PROVING' : 'REAL LIVE'}
                       </span>
                       {isActiveTarget && (
                         <span className="rounded bg-[#10B981]/15 text-[#10B981] text-[9px] font-mono font-bold px-1.5 py-0.5 border border-[#10B981]/30">
@@ -2082,12 +2181,41 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Server Lifecycle Banner */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-[#0E1017] border border-[#222736]">
+                    <div className="flex items-center space-x-2">
+                      {isRunning && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
+                          24/7 NON-STOP RUNNING
+                        </span>
+                      )}
+                      {isPaused && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">
+                          <Pause className="h-2.5 w-2.5 mr-1" />
+                          SERVER PAUSED
+                        </span>
+                      )}
+                      {isStopped && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/15 text-red-400 border border-red-500/30">
+                          <Square className="h-2.5 w-2.5 mr-1 fill-current" />
+                          SERVER STOPPED
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="inline-flex items-center text-[10px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 px-1.5 py-0.5 rounded">
+                      <ShieldCheck className="h-3 w-3 mr-1 text-cyan-400" />
+                      Saved in System
+                    </span>
+                  </div>
+
+                  {/* Server Telemetry Metrics */}
                   <div className="space-y-1.5 text-xs font-mono rounded-lg bg-[#0E0E11] p-3 border border-[#1F1F23]">
                     <div className="flex justify-between">
-                      <span className="text-[#8E9299]">Status:</span>
-                      <span className="text-[#10B981] font-bold flex items-center">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] mr-1.5 animate-pulse" />
-                        {acc.status}
+                      <span className="text-[#8E9299]">Server Uptime:</span>
+                      <span className="text-white font-medium">
+                        {formatServerUptime(acc.uptimeSeconds, acc.connectedAt)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -2100,45 +2228,191 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                       <span className="text-[#8E9299]">Leverage:</span>
                       <span className="text-zinc-200">{acc.leverage || '1:500'}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#8E9299]">Realized P&L:</span>
+                      <span className={((acc.metrics?.realizedPnL || 0) >= 0) ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                        ${(acc.metrics?.realizedPnL || 0).toLocaleString(undefined, { minimumFractionDigits: 2, signDisplay: 'always' })}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="pt-3 border-t border-[#1F1F23] flex justify-between items-center text-xs">
-                    <div className="flex items-center space-x-2">
-                      {onSelectActiveBroker && !isActiveTarget ? (
+                  {/* Server Controls: Pause, Stop, Run, Take Over, Rename, Delete */}
+                  <div className="pt-3 border-t border-[#1F1F23] space-y-2 text-xs">
+                    {/* Primary Row: Server Operations */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {isRunning && onPauseServer && (
                         <button
+                          type="button"
+                          disabled={isLoadingCurrent}
+                          onClick={async () => {
+                            setServerActionLoadingId(acc.id);
+                            try {
+                              await onPauseServer(acc.id);
+                              setFeedbackMessage({ text: `Server ${acc.name} paused.`, type: 'info' });
+                            } catch (e: any) {
+                              setFeedbackMessage({ text: e.message || 'Action failed', type: 'error' });
+                            } finally {
+                              setServerActionLoadingId(null);
+                            }
+                          }}
+                          className="flex-1 min-w-[90px] rounded bg-yellow-500/15 hover:bg-yellow-500/25 text-yellow-300 border border-yellow-500/30 px-2.5 py-1.5 text-xs font-mono font-semibold flex items-center justify-center space-x-1 transition-colors"
+                          title="Pause 24/7 background execution"
+                        >
+                          <Pause className="h-3 w-3" />
+                          <span>Pause</span>
+                        </button>
+                      )}
+
+                      {(isPaused || isStopped) && onResumeServer && (
+                        <button
+                          type="button"
+                          disabled={isLoadingCurrent}
+                          onClick={async () => {
+                            setServerActionLoadingId(acc.id);
+                            try {
+                              await onResumeServer(acc.id);
+                              setFeedbackMessage({ text: `Server ${acc.name} resumed non-stop 24/7 execution.`, type: 'success' });
+                            } catch (e: any) {
+                              setFeedbackMessage({ text: e.message || 'Action failed', type: 'error' });
+                            } finally {
+                              setServerActionLoadingId(null);
+                            }
+                          }}
+                          className="flex-1 min-w-[90px] rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 px-2.5 py-1.5 text-xs font-mono font-semibold flex items-center justify-center space-x-1 transition-colors"
+                          title="Run 24/7 non-stop execution"
+                        >
+                          <Play className="h-3 w-3 fill-current" />
+                          <span>Run Non-Stop</span>
+                        </button>
+                      )}
+
+                      {!isStopped && onStopServer && (
+                        <button
+                          type="button"
+                          disabled={isLoadingCurrent}
+                          onClick={async () => {
+                            setServerActionLoadingId(acc.id);
+                            try {
+                              await onStopServer(acc.id);
+                              setFeedbackMessage({ text: `Server ${acc.name} stopped.`, type: 'info' });
+                            } catch (e: any) {
+                              setFeedbackMessage({ text: e.message || 'Action failed', type: 'error' });
+                            } finally {
+                              setServerActionLoadingId(null);
+                            }
+                          }}
+                          className="flex-1 min-w-[90px] rounded bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-2.5 py-1.5 text-xs font-mono font-semibold flex items-center justify-center space-x-1 transition-colors"
+                          title="Stop execution engine"
+                        >
+                          <Square className="h-3 w-3 fill-current" />
+                          <span>Stop</span>
+                        </button>
+                      )}
+
+                      {onSelectActiveBroker && !isActiveTarget && (
+                        <button
+                          type="button"
                           onClick={() => onSelectActiveBroker(acc.id)}
-                          className="rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-3 py-1 text-xs font-semibold border border-blue-500/30 transition-colors"
+                          className="flex-1 min-w-[90px] rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2.5 py-1.5 text-xs font-semibold border border-blue-500/30 transition-colors text-center"
                         >
                           Take Over
                         </button>
-                      ) : (
-                        <span className="text-xs font-mono text-[#10B981] font-semibold flex items-center">
-                          <Check className="h-3.5 w-3.5 mr-1" /> Managing
-                        </span>
                       )}
+                    </div>
+
+                    {/* Secondary Row: Rename & Delete Server */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center space-x-2">
+                        {isActiveTarget && (
+                          <span className="text-xs font-mono text-[#10B981] font-semibold flex items-center">
+                            <Check className="h-3.5 w-3.5 mr-1" /> Primary Active
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleStartRename(acc)}
+                          className="rounded bg-[#0E0E11] hover:bg-zinc-800 text-zinc-300 hover:text-white px-2 py-1 text-xs font-mono flex items-center space-x-1 border border-[#1F1F23] hover:border-zinc-700 transition-colors"
+                          title="Rename account"
+                        >
+                          <Edit2 className="h-3 w-3 text-blue-400" />
+                          <span>Rename</span>
+                        </button>
+                      </div>
 
                       <button
                         type="button"
-                        onClick={() => handleStartRename(acc)}
-                        className="rounded bg-[#0E0E11] hover:bg-zinc-800 text-zinc-300 hover:text-white px-2.5 py-1 text-xs font-mono flex items-center space-x-1 border border-[#1F1F23] hover:border-zinc-700 transition-colors"
-                        title="Give this account any custom or random name"
+                        onClick={() => setServerToDelete(acc)}
+                        className="text-[#EF4444] hover:text-red-300 px-2 py-1 text-xs font-semibold flex items-center transition-colors"
+                        title="Permanently remove and delete server"
                       >
-                        <Edit2 className="h-3 w-3 text-blue-400" />
-                        <span>Rename</span>
+                        <Trash2 className="h-3.5 w-3.5 mr-1 inline" />
+                        <span>Delete Server</span>
                       </button>
                     </div>
-
-                    <button
-                      onClick={() => onDisconnectBroker(acc.id)}
-                      className="text-[#EF4444] hover:text-red-400 text-xs font-semibold flex items-center"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1 inline" /> Disconnect
-                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Delete Server Confirmation Modal */}
+          {serverToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+              <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0E1017] p-5 sm:p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center space-x-3 text-red-400">
+                  <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/30">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-base text-white">Delete Trading Server?</h4>
+                    <p className="text-xs text-[#8E9299]">Confirm permanent removal from system</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Are you sure you want to delete server <strong className="text-white">{serverToDelete.name}</strong> (#{serverToDelete.accountNumber})?
+                  This will halt its non-stop 24/7 background execution and permanently delete the connection credentials from the system disk storage.
+                </p>
+
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2433]">
+                  <button
+                    type="button"
+                    disabled={isDeletingServer}
+                    onClick={() => setServerToDelete(null)}
+                    className="px-3.5 py-2 rounded-lg bg-[#141722] hover:bg-[#1A1F2E] text-zinc-300 text-xs font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingServer}
+                    onClick={async () => {
+                      setIsDeletingServer(true);
+                      try {
+                        await onDisconnectBroker(serverToDelete.id);
+                        setFeedbackMessage({
+                          text: `Server ${serverToDelete.name} deleted and removed from system.`,
+                          type: 'info',
+                        });
+                        setServerToDelete(null);
+                      } catch (err: any) {
+                        setFeedbackMessage({
+                          text: 'Failed to delete server: ' + err.message,
+                          type: 'error',
+                        });
+                      } finally {
+                        setIsDeletingServer(false);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono transition-colors flex items-center space-x-1.5 shadow-lg shadow-red-600/30"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>{isDeletingServer ? 'Deleting...' : 'Confirm Delete Server'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

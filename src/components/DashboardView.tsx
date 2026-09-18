@@ -644,9 +644,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 2. MAIN TERMINAL GRID: CHART + BOT CONTROLLER & QUICK TICKET */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
         {/* Left Column: Interactive Price Chart & Indicators (8 cols) */}
-        <div className="lg:col-span-8 rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4">
+        <div className="lg:col-span-8 min-w-0 rounded-xl border border-[#1F1F23] bg-[#141416] p-3.5 sm:p-5 space-y-4">
           {/* Asset Tabs & Real-time Quote Header */}
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#1F1F23]">
             {/* Symbol Pills filtered by active category */}
@@ -852,8 +852,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Sub-chart: RSI & ATR Indicator Bar */}
           {selectedAsset && showIndicators.rsi && (
-            <div className="pt-3 border-t border-[#1F1F23] flex items-center justify-between text-xs font-mono">
-              <div className="flex items-center space-x-4">
+            <div className="pt-3 border-t border-[#1F1F23] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
                 <span className="text-[#8E9299]">
                   RSI (14):{' '}
                   <span
@@ -890,9 +890,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Right Column: Bot Status, Mode & Manual Trade Ticket (4 cols) */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 min-w-0 space-y-4">
           {/* Bot State & Mode Control Card */}
-          <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4">
+          <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3.5 sm:p-5 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
               <div className="flex items-center space-x-2">
                 <Cpu className="h-4 w-4 text-blue-400" />

@@ -12,7 +12,6 @@ import {
   Menu,
   Play,
   Pause,
-  RefreshCw,
   Shield,
   Sliders,
   Sparkles,
@@ -20,9 +19,8 @@ import {
   User,
   X,
   Zap,
-  Terminal,
 } from 'lucide-react';
-import { BotState, EnvironmentMode, NotificationItem, RiskSettings, TradingMode } from '../types';
+import { BotState, NotificationItem, OfflineSessionStats, RiskSettings } from '../types';
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useAuth } from '../context/AuthContext';
 
@@ -32,6 +30,7 @@ interface NavbarProps {
   botState: BotState;
   riskSettings: RiskSettings;
   notifications: NotificationItem[];
+  offlineSessionStats?: OfflineSessionStats;
   onToggleBot: () => void;
   onToggleTakeover?: () => void;
   onTriggerKillSwitch: () => void;
@@ -40,6 +39,15 @@ interface NavbarProps {
   onMarkNotificationsRead: () => void;
   onSelectSignalExplanation?: (id: string) => void;
   onOpenAuthModal?: () => void;
+  onOpenOfflineReport?: () => void;
+}
+
+interface NavItem {
+  id: string;
+  label: string;
+  desc: string;
+  category: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,6 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   botState,
   riskSettings,
   notifications,
+  offlineSessionStats,
   onToggleBot,
   onToggleTakeover,
   onTriggerKillSwitch,
@@ -55,10 +64,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSwitchToPaper,
   onMarkNotificationsRead,
   onOpenAuthModal,
+  onOpenOfflineReport,
 }) => {
   const { user, profile, cloudSyncStatus } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [timeUtc, setTimeUtc] = useState('');
 
   useEffect(() => {
@@ -69,43 +79,157 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Close hamburger drawer on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        setShowNotifications(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const navItems = [
-    { id: 'landing', label: 'Platform Overview', icon: Sparkles },
-    { id: 'dashboard', label: 'Dashboard', icon: Activity },
-    { id: 'workbook', label: 'User Workbook', icon: BookOpen },
-    { id: 'compounding', label: '$10 Wealth Engine', icon: TrendingUp },
-    { id: 'engine', label: 'Trading Engine', icon: Zap },
-    { id: 'brokers', label: 'MT5 & Broker Login', icon: Database },
-    { id: 'risk', label: 'Risk Controls', icon: Shield },
-    { id: 'strategies', label: 'Strategy Lab', icon: Layers },
-    { id: 'backtesting', label: 'Backtesting', icon: Cpu },
-    { id: 'testing', label: 'Test Suite', icon: CheckCircle },
-    { id: 'admin', label: 'Admin Telemetry', icon: Sliders },
+  const navItems: NavItem[] = [
+    ...(!user
+      ? [
+          {
+            id: 'landing',
+            label: 'Platform Overview',
+            desc: 'System architecture, performance & strategy highlights',
+            category: 'Platform',
+            icon: Sparkles,
+          },
+        ]
+      : []),
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      desc: 'Live execution, order entry & real-time PnL chart',
+      category: 'Core Terminal',
+      icon: Activity,
+    },
+    {
+      id: 'workbook',
+      label: 'User Workbook',
+      desc: 'Standard operating procedures, prompt guidelines & study modules',
+      category: 'Core Terminal',
+      icon: BookOpen,
+    },
+    {
+      id: 'brokers',
+      label: 'MT5 & Broker Login',
+      desc: 'MetaTrader 5 bridge, demo broker accounts & direct liquidity feeds',
+      category: 'Core Terminal',
+      icon: Database,
+    },
+    {
+      id: 'compounding',
+      label: '$10 Wealth Engine',
+      desc: 'Micro-capital geometric compounding matrix & risk tiers',
+      category: 'Algorithms & Growth',
+      icon: TrendingUp,
+    },
+    {
+      id: 'engine',
+      label: 'Trading Engine',
+      desc: 'Multi-asset scanner, confluence triggers & autonomous logic',
+      category: 'Algorithms & Growth',
+      icon: Zap,
+    },
+    {
+      id: 'strategies',
+      label: 'Strategy Lab',
+      desc: 'Regime shifter, scalping confluence & institutional momentum',
+      category: 'Algorithms & Growth',
+      icon: Layers,
+    },
+    {
+      id: 'risk',
+      label: 'Risk Controls',
+      desc: 'Drawdown limits, dynamic lot sizing & instant kill switch',
+      category: 'Risk & Safety',
+      icon: Shield,
+    },
+    {
+      id: 'backtesting',
+      label: 'Backtesting',
+      desc: 'Historical tick replay & Monte Carlo stress testing',
+      category: 'Risk & Safety',
+      icon: Cpu,
+    },
+    {
+      id: 'testing',
+      label: 'Test Suite',
+      desc: 'Automated order dispatch & endpoint diagnostics',
+      category: 'System & Telemetry',
+      icon: CheckCircle,
+    },
+    {
+      id: 'admin',
+      label: 'Admin Telemetry',
+      desc: 'System health, server metrics & Cloud Firestore sync',
+      category: 'System & Telemetry',
+      icon: Sliders,
+    },
   ];
 
   const handleSelectNav = (tabId: string) => {
     onSelectTab(tabId);
-    setMobileMenuOpen(false);
+    setMenuOpen(false);
   };
+
+  const activeItem = navItems.find((n) => n.id === currentTab) || navItems[0];
+
+  // Group items by category for clear hierarchical navigation
+  const categories = Array.from(new Set(navItems.map((item) => item.category)));
 
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-[#1F1F23] bg-[#0E0E11]/95 backdrop-blur-md">
-        {/* Top Utility Bar */}
-        <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 lg:px-8 border-b border-[#1F1F23] text-xs">
-          {/* Brand */}
+        {/* Main Header Bar */}
+        <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 lg:px-8 text-xs">
+          {/* Left: Brand + Hamburger Menu Button */}
           <div className="flex items-center space-x-2.5 sm:space-x-4">
+            {/* Primary Hamburger Menu Button */}
             <button
-              onClick={() => onSelectTab(currentTab === 'landing' ? 'dashboard' : 'landing')}
-              className="flex items-center space-x-2.5 sm:space-x-3.5 text-left group transition-opacity hover:opacity-90 cursor-pointer"
-              title="Click to toggle between Platform Overview and Live Terminal"
+              id="navbar-hamburger-btn"
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className={`flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all cursor-pointer select-none group ${
+                menuOpen
+                  ? 'bg-blue-600/25 border-blue-500/60 text-white ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10'
+                  : 'bg-[#141416] border-[#27272A] hover:border-blue-500/50 hover:bg-[#1B1D24] text-zinc-200 shadow-sm'
+              }`}
+              title="Open Navigation Menu (Dashboard, User Workbook, etc.)"
+              aria-label="Navigation Menu"
+            >
+              {menuOpen ? (
+                <X className="h-4 w-4 text-white shrink-0" />
+              ) : (
+                <Menu className="h-4 w-4 text-blue-400 group-hover:text-blue-300 transition-colors shrink-0" />
+              )}
+              <span className="font-semibold text-xs text-white">Menu</span>
+              {activeItem && (
+                <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#1C202E] text-blue-300 border border-[#2B3248] max-w-[130px] truncate">
+                  {activeItem.label}
+                </span>
+              )}
+            </button>
+
+            {/* Brand Logo & Name */}
+            <button
+              onClick={() => onSelectTab(user ? 'dashboard' : currentTab === 'landing' ? 'dashboard' : 'landing')}
+              className="flex items-center space-x-2 sm:space-x-3 text-left group transition-opacity hover:opacity-90 cursor-pointer"
+              title={user ? 'Quantara Institutional Trading' : 'Click to toggle Platform Overview'}
             >
               <QuantaraLogoMark size="sm" />
               <div>
-                <div className="flex items-center space-x-1.5 sm:space-x-2.5">
-                  <span className="font-brand text-base sm:text-lg font-extrabold tracking-[0.18em] sm:tracking-[0.2em] text-white flex items-center leading-none select-none group-hover:text-blue-300 transition-colors">
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  <span className="font-brand text-base sm:text-lg font-extrabold tracking-[0.16em] sm:tracking-[0.18em] text-white flex items-center leading-none select-none group-hover:text-blue-300 transition-colors">
                     QUANT<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500">ARA</span>
                   </span>
                   <span className="hidden xs:inline-flex rounded border border-blue-500/25 bg-blue-500/10 px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-tech font-bold uppercase tracking-wider text-blue-400 leading-none">
@@ -120,21 +244,34 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </button>
 
-            {/* Desktop Engine Status */}
-            <div className="hidden lg:flex items-center pl-4 border-l border-[#1F1F23] space-x-3">
-              <div className="flex items-center space-x-2 px-3 py-1 bg-[#10B981]/10 border border-[#10B981]/20 rounded-full">
-                <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></div>
-                <span className="text-xs font-medium text-[#10B981]">
-                  {botState.isRunning ? 'ENGINE LIVE' : 'ENGINE PAUSED'}
+            {/* Engine 24/7 Cloud Status Button */}
+            <div className="hidden lg:flex items-center pl-3 border-l border-[#1F1F23] space-x-2.5">
+              <button
+                onClick={onOpenOfflineReport}
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                  botState.isRunning
+                    ? 'bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981] hover:bg-[#10B981]/25 shadow-sm shadow-emerald-950/20'
+                    : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20'
+                }`}
+                title="24/7 Autonomous Cloud Engine: Click to open Wealth Generation Report"
+              >
+                <div className={`w-2 h-2 rounded-full ${botState.isRunning ? 'bg-[#10B981] animate-pulse' : 'bg-yellow-400'}`} />
+                <span className="text-[11px] font-mono font-bold tracking-tight">
+                  {botState.isRunning ? '24/7 CLOUD ACTIVE' : 'ENGINE PAUSED'}
                 </span>
-              </div>
+                {offlineSessionStats?.realizedPnlOffline ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                    +{offlineSessionStats.realizedPnlOffline >= 0 ? '$' : '-$'}{Math.abs(offlineSessionStats.realizedPnlOffline).toFixed(2)}
+                  </span>
+                ) : null}
+              </button>
               <span className="font-mono text-[11px] text-[#8E9299]">{timeUtc}</span>
             </div>
           </div>
 
-          {/* Action Controls */}
+          {/* Right: Quick Action Controls */}
           <div className="flex items-center space-x-1.5 sm:space-x-3">
-            {/* Desktop Environment Mode Switcher */}
+            {/* Paper / Live Switcher */}
             <div className="hidden md:flex items-center rounded-lg border border-[#1F1F23] bg-[#141416] p-0.5">
               <button
                 onClick={onSwitchToPaper}
@@ -175,10 +312,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Desktop Bot State Quick Toggle */}
+            {/* Quick Engine Resume/Pause Button */}
             <button
               onClick={onToggleBot}
-              className={`hidden sm:flex items-center space-x-1.5 rounded-lg px-3 py-2 font-mono text-xs font-semibold transition-all border ${
+              className={`hidden sm:flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold transition-all border ${
                 botState.isRunning
                   ? 'border-[#1F1F23] bg-[#141416] text-[#E4E4E7] hover:bg-[#1F1F23]'
                   : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
@@ -197,10 +334,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Emergency Kill Switch Button */}
+            {/* Emergency Kill Switch */}
             <button
               onClick={onTriggerKillSwitch}
-              className={`flex items-center space-x-1 sm:space-x-1.5 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-lg ${
+              className={`flex items-center space-x-1 sm:space-x-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-md ${
                 riskSettings.killSwitchActive
                   ? 'bg-[#DC2626] text-white animate-bounce ring-2 ring-red-400 shadow-red-900/40'
                   : 'bg-[#EF4444] hover:bg-[#DC2626] text-white shadow-red-900/20'
@@ -231,7 +368,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Notifications Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-96 rounded-xl border border-[#1F1F23] bg-[#141416] p-4 shadow-2xl z-50">
+                <div className="absolute right-0 mt-2 w-72 sm:w-96 rounded-xl border border-[#1F1F23] bg-[#141416] p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
                     <div className="flex items-center space-x-2">
                       <Bell className="h-4 w-4 text-blue-400" />
@@ -267,7 +404,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                               {notif.type}
                             </span>
                             <span className="text-[10px] text-[#8E9299] font-mono">
-                              {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              {new Date(notif.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
                             </span>
                           </div>
                           <p className="text-xs font-medium text-white">{notif.title}</p>
@@ -280,48 +421,36 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Enterprise Cloud DB Indicator */}
-            <div
-              className="hidden xl:flex items-center space-x-1.5 rounded-lg border border-[#1F2330] bg-[#12151F] px-2.5 py-1.5 text-[11px] font-mono text-[#8E9299]"
-              title="Cloud Database: quantara-261d0 (Firestore Enterprise)"
-            >
-              <Database className="h-3.5 w-3.5 text-blue-400" />
-              <span className="text-zinc-300">quantara-261d0</span>
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  cloudSyncStatus === 'synced'
-                    ? 'bg-emerald-400 animate-pulse'
-                    : cloudSyncStatus === 'syncing'
-                    ? 'bg-cyan-400 animate-spin'
-                    : 'bg-amber-400'
-                }`}
-              />
-            </div>
-
             {/* Enterprise Auth & Account Profile Button */}
             {onOpenAuthModal && (
               <button
                 type="button"
                 onClick={onOpenAuthModal}
-                className={`flex items-center space-x-2 rounded-lg border px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`flex items-center space-x-2 rounded-lg border px-2 sm:px-3 py-1.5 text-xs font-medium transition-all ${
                   user
                     ? 'border-blue-500/40 bg-blue-950/25 hover:bg-blue-900/30 text-white shadow-sm'
                     : 'border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/30 hover:to-cyan-600/30 text-blue-200 hover:text-white'
                 }`}
+                title={user ? 'Account Profile & Preferred Picture' : 'Sign In'}
               >
                 {user ? (
                   <>
-                    <div className="h-5 w-5 rounded-full bg-blue-500/20 border border-blue-400/40 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300 overflow-hidden shrink-0">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                    <div className="h-6 w-6 rounded-full bg-blue-500/20 border border-blue-400/50 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300 overflow-hidden shrink-0 shadow-sm ring-1 ring-blue-500/30">
+                      {profile?.photoURL || user.photoURL ? (
+                        <img
+                          src={profile?.photoURL || user.photoURL}
+                          alt={profile?.displayName || 'Profile'}
+                          className="h-full w-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
                       ) : (
-                        user.email?.[0].toUpperCase() || 'U'
+                        (profile?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()
                       )}
                     </div>
                     <span className="hidden sm:inline font-mono text-[11px] font-semibold text-zinc-200 max-w-[110px] truncate">
                       {profile?.displayName || user.displayName || user.email?.split('@')[0]}
                     </span>
-                    <span className="hidden lg:inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    <span className="hidden xl:inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
                       {profile?.role || 'OPERATOR'}
                     </span>
                   </>
@@ -346,93 +475,83 @@ export const Navbar: React.FC<NavbarProps> = ({
                         d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.29 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                       />
                     </svg>
-                    <span className="font-medium hidden sm:inline">Sign In / Gmail</span>
-                    <span className="font-medium sm:hidden">Sign In</span>
+                    <span className="font-medium hidden sm:inline">Sign In</span>
                   </>
                 )}
               </button>
             )}
-
-            {/* Mobile Hamburger Toggle Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-[#1F1F23] bg-[#141416] text-[#8E9299] hover:text-white"
-              aria-label="Toggle navigation drawer"
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4 text-white" /> : <Menu className="h-4 w-4 text-white" />}
-            </button>
           </div>
-        </div>
-
-        {/* Desktop Navigation Tabs Bar */}
-        <div className="hidden md:flex items-center space-x-1 px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-none py-2 bg-[#0E0E11]">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                className={`flex items-center space-x-2 rounded-md px-3 py-1.5 text-xs lg:text-sm font-medium whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'bg-[#1F1F23] text-white font-semibold shadow-sm'
-                    : 'text-[#8E9299] hover:bg-[#141416] hover:text-white'
-                }`}
-              >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-blue-400' : 'text-[#8E9299]'}`} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
         </div>
       </header>
 
-      {/* Mobile Drawer Sheet */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      {/* Hamburger Navigation Drawer Modal (Covers all screen sizes seamlessly) */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex animate-in fade-in duration-200">
+          {/* Backdrop Blur Overlay */}
           <div
-            className="w-full bg-[#141416] border-t border-[#2E2E33] rounded-t-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close menu"
+          />
+
+          {/* Left Slide-Out Navigation Panel */}
+          <div
+            id="hamburger-navigation-drawer"
+            className="relative z-10 w-full max-w-sm sm:max-w-md bg-[#0D1017] border-r border-[#1E2330] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-left duration-200"
           >
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
-              <div className="flex items-center space-x-2.5">
+            {/* Drawer Top Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2330] bg-[#090C12]/90">
+              <div className="flex items-center space-x-3">
                 <QuantaraLogoMark size="sm" />
-                <span className="font-brand text-base font-extrabold tracking-wider text-white">
-                  QUANT<span className="text-blue-400">ARA</span>
-                </span>
-                <span className="text-[10px] font-mono text-[#8E9299] px-2 py-0.5 rounded bg-[#0E0E11] border border-[#1F1F23]">
-                  {timeUtc}
-                </span>
+                <div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-brand text-base font-extrabold tracking-wider text-white">
+                      QUANT<span className="text-blue-400">ARA</span>
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-blue-400 px-1.5 py-0.2 rounded bg-blue-500/10 border border-blue-500/20">
+                      NAVIGATOR
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#8E9299]">{timeUtc}</span>
+                </div>
               </div>
+
               <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg bg-[#1F1F23] text-[#8E9299] hover:text-white"
+                onClick={() => setMenuOpen(false)}
+                className="p-1.5 rounded-lg bg-[#151924] border border-[#232A3B] text-zinc-400 hover:text-white hover:bg-[#1E2538] transition-colors cursor-pointer"
+                title="Close Navigation (Esc)"
+                aria-label="Close Navigation"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Mobile User Profile & Cloud DB Header Card */}
-            <div className="rounded-xl border border-blue-500/30 bg-[#0E121E] p-3.5 space-y-2">
+            {/* User Profile & Database Snapshot */}
+            <div className="p-4 border-b border-[#1E2330] bg-[#0E121E]/60 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="h-8 w-8 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center font-mono text-xs font-bold text-blue-300 overflow-hidden">
-                    {user?.photoURL ? (
-                      <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="h-10 w-10 rounded-full bg-blue-500/20 border-2 border-blue-400/50 flex items-center justify-center font-mono text-xs font-bold text-blue-300 overflow-hidden shrink-0 shadow-md ring-1 ring-blue-500/30">
+                    {profile?.photoURL || user?.photoURL ? (
+                      <img
+                        src={profile?.photoURL || user?.photoURL}
+                        alt={profile?.displayName || 'Avatar'}
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
                     ) : (
-                      user?.email?.[0].toUpperCase() || 'U'
+                      (profile?.displayName?.[0] || user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase()
                     )}
                   </div>
-                  <div>
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-xs font-bold text-white">
-                        {user ? (profile?.displayName || user.displayName || user.email?.split('@')[0]) : 'Guest Operator'}
+                  <div className="min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-white truncate max-w-[140px]">
+                        {user ? profile?.displayName || user.displayName || user.email?.split('@')[0] : 'Guest Operator'}
                       </span>
                       <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                        {user ? (profile?.role || 'OPERATOR') : 'LOCAL'}
+                        {user ? profile?.role || 'OPERATOR' : 'LOCAL'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-[#8E9299] font-mono truncate max-w-[180px]">
+                    <p className="text-[11px] text-[#8E9299] font-mono truncate max-w-[180px]">
                       {user ? user.email : 'DB: quantara-261d0'}
                     </p>
                   </div>
@@ -441,119 +560,170 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {onOpenAuthModal && (
                   <button
                     onClick={() => {
-                      setMobileMenuOpen(false);
+                      setMenuOpen(false);
                       onOpenAuthModal();
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 transition-colors"
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 transition-colors shrink-0 shadow-sm"
                   >
                     {user ? 'Account' : 'Sign In'}
                   </button>
                 )}
               </div>
-            </div>
 
-            {/* Quick Controls Grid in Drawer */}
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-              {/* Paper / Live toggle */}
-              <div className="rounded-lg bg-[#0E0E11] p-2.5 border border-[#1F1F23] space-y-1.5">
-                <span className="text-[10px] text-[#8E9299] uppercase font-bold block">Trading Mode</span>
-                <div className="grid grid-cols-2 gap-1">
+              {/* Quick Mode / State Toggles inside Drawer */}
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div className="rounded-lg bg-[#0A0D14] p-2 border border-[#1E2330] flex items-center justify-between">
+                  <span className="text-[10px] text-[#8E9299] uppercase font-bold">Mode</span>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={onSwitchToPaper}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        botState.environment === 'paper' ? 'bg-blue-600 text-white' : 'text-[#8E9299] hover:text-white'
+                      }`}
+                    >
+                      PAPER
+                    </button>
+                    <button
+                      onClick={onRequestLiveMode}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        botState.environment === 'live' ? 'bg-red-600 text-white' : 'text-[#8E9299] hover:text-white'
+                      }`}
+                    >
+                      LIVE
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-[#0A0D14] p-2 border border-[#1E2330] flex items-center justify-between">
+                  <span className="text-[10px] text-[#8E9299] uppercase font-bold">Engine</span>
                   <button
-                    onClick={() => { onSwitchToPaper(); setMobileMenuOpen(false); }}
-                    className={`py-1 rounded text-center text-[11px] font-bold ${
-                      botState.environment === 'paper' ? 'bg-blue-600 text-white' : 'text-[#8E9299] bg-[#1F1F23]'
+                    onClick={onToggleBot}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 ${
+                      botState.isRunning
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                     }`}
                   >
-                    PAPER
-                  </button>
-                  <button
-                    onClick={() => { onRequestLiveMode(); setMobileMenuOpen(false); }}
-                    className={`py-1 rounded text-center text-[11px] font-bold ${
-                      botState.environment === 'live' ? 'bg-[#EF4444] text-white' : 'text-[#8E9299] bg-[#1F1F23]'
-                    }`}
-                  >
-                    LIVE
+                    {botState.isRunning ? <Pause className="h-2.5 w-2.5" /> : <Play className="h-2.5 w-2.5 fill-current" />}
+                    <span>{botState.isRunning ? 'LIVE' : 'PAUSED'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Bot Engine Run/Pause */}
-              <div className="rounded-lg bg-[#0E0E11] p-2.5 border border-[#1F1F23] space-y-1.5">
-                <span className="text-[10px] text-[#8E9299] uppercase font-bold block">Engine State</span>
-                <button
-                  onClick={onToggleBot}
-                  className={`w-full py-1.5 rounded flex items-center justify-center space-x-1.5 text-[11px] font-bold ${
-                    botState.isRunning
-                      ? 'bg-[#1F1F23] text-white border border-[#2E2E33]'
-                      : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                  }`}
-                >
-                  {botState.isRunning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3 fill-current" />}
-                  <span>{botState.isRunning ? 'PAUSE BOT' : 'RESUME BOT'}</span>
-                </button>
+              {/* 24/7 Cloud Background Execution Card */}
+              <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-[#0D1624] to-[#0A101C] p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${botState.isRunning ? 'bg-emerald-400 opacity-75' : 'bg-yellow-400 opacity-75'}`} />
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${botState.isRunning ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
+                    </span>
+                    <span className="text-[11px] font-tech font-bold uppercase tracking-wider text-emerald-300">
+                      24/7 Autonomous Server
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    {botState.isRunning ? 'RUNNING NON-STOP' : 'PAUSED'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-zinc-300 font-mono leading-relaxed">
+                  Trades execute automatically around the clock even when you are offline or your browser is closed. The engine continuously compounds wealth until you choose to stop it.
+                </p>
+                {onOpenOfflineReport && (
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenOfflineReport();
+                    }}
+                    className="w-full py-1.5 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-200 text-xs font-mono font-bold transition-all flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>View 24/7 Wealth Report</span>
+                    {offlineSessionStats?.realizedPnlOffline ? (
+                      <span className="text-emerald-400 font-extrabold">
+                        (+${offlineSessionStats.realizedPnlOffline.toFixed(2)})
+                      </span>
+                    ) : null}
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Takeover & Kill Switch Banner */}
-            <div className="space-y-2">
-              {onToggleTakeover && (
-                <button
-                  onClick={onToggleTakeover}
-                  className={`w-full py-2.5 px-3 rounded-lg text-xs font-tech font-bold uppercase tracking-wider flex items-center justify-between border ${
-                    botState.autonomousTakeover
-                      ? 'bg-[#10B981]/20 border-[#10B981]/40 text-[#10B981]'
-                      : 'bg-[#1F1F23] border-[#2E2E33] text-[#8E9299]'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${botState.autonomousTakeover ? 'bg-[#10B981] animate-pulse' : 'bg-zinc-600'}`} />
-                    <span>Autonomous Software Takeover</span>
-                  </div>
-                  <span className="font-bold">{botState.autonomousTakeover ? 'ACTIVE' : 'OFF'}</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => { onTriggerKillSwitch(); setMobileMenuOpen(false); }}
-                className={`w-full py-2.5 px-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center space-x-2 ${
-                  riskSettings.killSwitchActive
-                    ? 'bg-[#DC2626] text-white ring-2 ring-red-400'
-                    : 'bg-[#EF4444] hover:bg-[#DC2626] text-white'
-                }`}
-              >
-                <AlertOctagon className="h-4 w-4" />
-                <span>{riskSettings.killSwitchActive ? 'RESET EMERGENCY LOCK' : 'EMERGENCY STOP (KILL SWITCH)'}</span>
-              </button>
-            </div>
-
-            {/* Navigation Modules List */}
-            <div className="space-y-1 pt-1">
-              <span className="text-[10px] uppercase font-bold text-[#8E9299] tracking-wider block px-1 mb-1">
-                Trading Platform Modules
-              </span>
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentTab === item.id;
+            {/* Categorized Navigation Menu List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 divide-y divide-[#181C26]">
+              {categories.map((category) => {
+                const categoryItems = navItems.filter((i) => i.category === category);
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelectNav(item.id)}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all ${
-                      isActive
-                        ? 'bg-blue-600/20 text-white font-semibold border border-blue-500/40'
-                        : 'text-[#8E9299] hover:bg-[#1F1F23] hover:text-white border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-1.5 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-[#0E0E11] text-[#8E9299]'}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <span className="text-sm">{item.label}</span>
+                  <div key={category} className="pt-3 first:pt-0 space-y-1.5">
+                    <div className="flex items-center justify-between px-2 mb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400/80 font-mono">
+                        {category}
+                      </span>
+                      <span className="text-[9px] text-[#6E727A] font-mono">
+                        {categoryItems.length} items
+                      </span>
                     </div>
-                    <ChevronRight className={`h-4 w-4 ${isActive ? 'text-blue-400' : 'text-zinc-600'}`} />
-                  </button>
+
+                    <div className="space-y-1">
+                      {categoryItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = currentTab === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleSelectNav(item.id)}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all group cursor-pointer ${
+                              isActive
+                                ? 'bg-gradient-to-r from-blue-600/25 to-blue-500/10 text-white font-semibold border border-blue-500/50 shadow-md shadow-blue-500/10'
+                                : 'text-zinc-300 hover:bg-[#141824] hover:text-white border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-start space-x-3 min-w-0">
+                              <div
+                                className={`p-2 rounded-lg shrink-0 mt-0.5 transition-colors ${
+                                  isActive
+                                    ? 'bg-blue-500/30 text-blue-300 border border-blue-400/40'
+                                    : 'bg-[#121622] text-[#8E9299] group-hover:text-blue-300 group-hover:bg-[#1A2030]'
+                                }`}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs sm:text-sm font-semibold truncate text-white group-hover:text-blue-200 transition-colors">
+                                    {item.label}
+                                  </span>
+                                  {isActive && (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-[#8E9299] font-sans truncate max-w-[220px] sm:max-w-[260px] leading-tight mt-0.5">
+                                  {item.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            <ChevronRight
+                              className={`h-4 w-4 shrink-0 transition-transform ${
+                                isActive ? 'text-blue-400 translate-x-0.5' : 'text-zinc-600 group-hover:text-zinc-400'
+                              }`}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
+            </div>
+
+            {/* Drawer Bottom Footer */}
+            <div className="p-3 border-t border-[#1E2330] bg-[#090C12] flex items-center justify-between text-[11px] font-mono text-[#8E9299]">
+              <div className="flex items-center space-x-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Quantara v2.8 Core</span>
+              </div>
+              <span className="text-zinc-500">ESC to close</span>
             </div>
           </div>
         </div>
@@ -572,6 +742,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
+          onClick={() => onSelectTab('workbook')}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-lg transition-colors ${
+            currentTab === 'workbook' ? 'text-blue-400 font-bold' : 'text-[#8E9299]'
+          }`}
+        >
+          <BookOpen className="h-4 w-4 mb-0.5" />
+          <span className="text-[10px]">Workbook</span>
+        </button>
+
+        <button
           onClick={() => onSelectTab('compounding')}
           className={`flex flex-col items-center justify-center p-1.5 rounded-lg transition-colors relative ${
             currentTab === 'compounding' ? 'text-blue-400 font-bold' : 'text-[#8E9299]'
@@ -579,17 +759,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <TrendingUp className="h-4 w-4 mb-0.5" />
           <span className="text-[10px]">$10 Wealth</span>
-          <span className="absolute -top-0.5 right-1 h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-        </button>
-
-        <button
-          onClick={() => onSelectTab('engine')}
-          className={`flex flex-col items-center justify-center p-1.5 rounded-lg transition-colors ${
-            currentTab === 'engine' ? 'text-blue-400 font-bold' : 'text-[#8E9299]'
-          }`}
-        >
-          <Zap className="h-4 w-4 mb-0.5" />
-          <span className="text-[10px]">Engine</span>
         </button>
 
         <button
@@ -603,11 +772,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center p-1.5 rounded-lg text-[#8E9299] hover:text-white"
+          onClick={() => setMenuOpen(true)}
+          className="flex flex-col items-center justify-center p-1.5 rounded-lg text-blue-400 hover:text-white transition-colors"
         >
           <Menu className="h-4 w-4 mb-0.5" />
-          <span className="text-[10px]">More</span>
+          <span className="text-[10px] font-semibold">All Tabs</span>
         </button>
       </nav>
     </>

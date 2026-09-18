@@ -29,6 +29,7 @@ export interface SnapshotData {
   assets: MarketAsset[];
   riskSettings: RiskSettings;
   brokerAccounts: BrokerAccount[];
+  offlineSessionStats?: import('../types').OfflineSessionStats;
 }
 
 export const api = {
@@ -316,6 +317,40 @@ export const api = {
     return res.json();
   },
 
+  async pauseBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const res = await fetch(`/api/brokers/${id}/pause-server`, { method: 'POST' });
+    return res.json();
+  },
+
+  async resumeBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const res = await fetch(`/api/brokers/${id}/resume-server`, { method: 'POST' });
+    return res.json();
+  },
+
+  async stopBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const res = await fetch(`/api/brokers/${id}/stop-server`, { method: 'POST' });
+    return res.json();
+  },
+
+  async pauseAllServers(): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
+    const res = await fetch('/api/brokers/server/pause-all', { method: 'POST' });
+    return res.json();
+  },
+
+  async runAllServersNonStop(): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
+    const res = await fetch('/api/brokers/server/run-all', { method: 'POST' });
+    return res.json();
+  },
+
+  async syncBrokerAccounts(accounts: BrokerAccount[]): Promise<{ success: boolean; accounts: BrokerAccount[]; botState: BotState }> {
+    const res = await fetch('/api/brokers/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accounts }),
+    });
+    return res.json();
+  },
+
   // Automated Tests
   async runAutomatedTests(): Promise<{ total: number; passed: number; failed: number; results: any[] }> {
     const res = await fetch('/api/tests/run', { method: 'POST' });
@@ -344,6 +379,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    return res.json();
+  },
+
+  // 24/7 Offline Wealth Report
+  async getOfflineReport(): Promise<{ success: boolean; offlineReport: import('../types').OfflineSessionStats | null }> {
+    const res = await fetch('/api/offline-report');
+    return res.json();
+  },
+
+  async dismissOfflineReport(): Promise<{ success: boolean }> {
+    const res = await fetch('/api/offline-report/dismiss', { method: 'POST' });
     return res.json();
   },
 };

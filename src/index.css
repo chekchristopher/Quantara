@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
 @layer base {
+  html,
   body {
     background-color: #0A0A0B;
     color: #E4E4E7;
     font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -31,5 +36,51 @@ body,
 * {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Market Price Ticker Ribbon Animations */
+@keyframes ticker-oscillate {
+  0% {
+    transform: translate3d(0%, 0, 0);
+  }
+  50% {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+@keyframes ticker-scroll-left {
+  0% {
+    transform: translate3d(0%, 0, 0);
+  }
+  100% {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+}
+
+@keyframes ticker-scroll-right {
+  0% {
+    transform: translate3d(-33.333%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+.animate-ticker-oscillate {
+  animation: ticker-oscillate 150s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-ticker-left {
+  animation: ticker-scroll-left 130s linear infinite;
+  will-change: transform;
+}
+
+.animate-ticker-right {
+  animation: ticker-scroll-right 130s linear infinite;
+  will-change: transform;
 }
 

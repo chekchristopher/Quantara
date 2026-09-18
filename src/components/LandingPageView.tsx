@@ -34,52 +34,15 @@ interface LandingPageViewProps {
   onOpenAuthModal: () => void;
 }
 
-interface MarketTicker {
-  symbol: string;
-  bid: number;
-  ask: number;
-  change24h: number;
-  spread: number;
-}
-
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onNavigateTab,
   onOpenAuthModal,
 }) => {
   const { user } = useAuth();
 
-  // Live fluctuating ticker data for top banner
-  const [tickers, setTickers] = useState<MarketTicker[]>([
-    { symbol: 'XAU/USD', bid: 2654.40, ask: 2654.65, change24h: 1.42, spread: 0.25 },
-    { symbol: 'EUR/USD', bid: 1.0842, ask: 1.0843, change24h: 0.18, spread: 0.1 },
-    { symbol: 'GBP/USD', bid: 1.2985, ask: 1.2987, change24h: -0.24, spread: 0.2 },
-    { symbol: 'USD/JPY', bid: 153.28, ask: 153.30, change24h: 0.52, spread: 0.2 },
-    { symbol: 'BTC/USD', bid: 67840.0, ask: 67845.0, change24h: 3.15, spread: 5.0 },
-    { symbol: 'NAS100', bid: 20380.5, ask: 20382.0, change24h: 0.88, spread: 1.5 },
-  ]);
-
   // Selected strategy for interactive regime simulator
   const [selectedStrategy, setSelectedStrategy] = useState<number>(0);
   const [activeTabPreview, setActiveTabPreview] = useState<'terminal' | 'risk' | 'compounding'>('terminal');
-
-  // Periodic tick simulator for live feel
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTickers((prev) =>
-        prev.map((item) => {
-          const delta = (Math.random() - 0.49) * (item.bid * 0.0004);
-          const newBid = Number((item.bid + delta).toFixed(item.symbol.includes('USD') && !item.symbol.includes('BTC') && !item.symbol.includes('XAU') ? 4 : 2));
-          const newAsk = Number((newBid + item.spread * (item.symbol.includes('BTC') ? 1 : item.symbol.includes('EUR') ? 0.0001 : 0.01)).toFixed(item.symbol.includes('USD') && !item.symbol.includes('BTC') && !item.symbol.includes('XAU') ? 4 : 2));
-          return {
-            ...item,
-            bid: newBid,
-            ask: newAsk,
-          };
-        })
-      );
-    }, 2400);
-    return () => clearInterval(interval);
-  }, []);
 
   const strategiesData = [
     {
@@ -146,35 +109,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   return (
     <div className="w-full text-[#E4E4E7] space-y-16 lg:space-y-24 pb-12 animate-in fade-in duration-300">
-      {/* 1. Real-Time Market Ticker Ribbon */}
-      <div className="-mt-3 sm:-mt-6 -mx-3 sm:-mx-6 lg:-mx-8 border-y border-[#1E222E] bg-[#0A0D14]/90 backdrop-blur-md overflow-hidden py-2 px-4 shadow-inner">
-        <div className="flex items-center space-x-6 overflow-x-auto no-scrollbar whitespace-nowrap text-xs font-mono">
-          <div className="flex items-center space-x-2 text-blue-400 font-bold uppercase tracking-wider text-[11px] shrink-0 border-r border-[#1E222E] pr-4">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>MT5 Direct Bridge Feed</span>
-          </div>
-          {tickers.map((t) => (
-            <div key={t.symbol} className="flex items-center space-x-2.5 shrink-0">
-              <span className="text-zinc-200 font-bold">{t.symbol}</span>
-              <span className="text-zinc-400 text-[11px]">B: {t.bid}</span>
-              <span className="text-zinc-400 text-[11px]">A: {t.ask}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                  t.change24h >= 0
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                }`}
-              >
-                {t.change24h >= 0 ? '+' : ''}
-                {t.change24h}%
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 2. Hero Section */}
-      <section className="relative pt-6 sm:pt-10 lg:pt-16 pb-4">
+      {/* 1. Hero Section */}
+      <section className="relative pt-4 sm:pt-8 lg:pt-12 pb-4">
         {/* Subtle Ambient Radial Lighting */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-blue-600/15 via-cyan-500/10 to-indigo-600/10 blur-[120px] pointer-events-none -z-10 rounded-full" />
 
@@ -346,32 +282,44 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </div>
 
                 {/* Simulated Order Execution Matrix */}
-                <div className="rounded-xl border border-[#1E2435] bg-[#0E121B] p-4 font-mono text-xs overflow-x-auto">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#1A2030] text-[11px] text-[#787E92] min-w-[540px]">
+                <div className="rounded-xl border border-[#1E2435] bg-[#0E121B] p-3 sm:p-4 font-mono text-xs overflow-x-auto">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#1A2030] text-[11px] text-[#787E92]">
                     <span>REAL-TIME EXECUTION LOGS</span>
-                    <span className="text-emerald-400">AUTONOMOUS TAKE-OVER ACTIVE</span>
+                    <span className="text-emerald-400 font-semibold">AUTONOMOUS TAKE-OVER ACTIVE</span>
                   </div>
-                  <div className="mt-3 space-y-2 text-[11px] min-w-[540px]">
-                    <div className="flex items-center justify-between text-zinc-300 bg-[#121624] px-3 py-1.5 rounded">
-                      <span className="text-emerald-400 font-bold">[EXEC] BUY XAU/USD</span>
-                      <span>Lot: 1.50 @ 2652.10</span>
-                      <span className="text-zinc-400">SL: 2646.00 | TP: 2668.50</span>
-                      <span className="text-emerald-400 font-bold">+$615.00 (+1.2%)</span>
-                      <span className="text-[10px] text-zinc-500">Exness-MT5Real #48291</span>
+                  <div className="mt-3 space-y-2 text-[11px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-zinc-300 bg-[#121624] p-2.5 sm:px-3 sm:py-1.5 rounded gap-1 sm:gap-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-emerald-400 font-bold">[EXEC] BUY XAU/USD</span>
+                        <span className="text-zinc-400">Lot: 1.50 @ 2652.10</span>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end space-x-3 text-[10px] sm:text-[11px]">
+                        <span className="text-zinc-400">SL: 2646 | TP: 2668.50</span>
+                        <span className="text-emerald-400 font-bold">+$615.00 (+1.2%)</span>
+                        <span className="text-zinc-500 hidden md:inline">Exness-MT5Real #48291</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-zinc-300 bg-[#121624] px-3 py-1.5 rounded">
-                      <span className="text-emerald-400 font-bold">[EXEC] BUY EUR/USD</span>
-                      <span>Lot: 4.00 @ 1.0825</span>
-                      <span className="text-zinc-400">SL: 1.0805 | TP: 1.0870</span>
-                      <span className="text-emerald-400 font-bold">+$480.00 (+0.9%)</span>
-                      <span className="text-[10px] text-zinc-500">ICMarkets-Server4</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-zinc-300 bg-[#121624] p-2.5 sm:px-3 sm:py-1.5 rounded gap-1 sm:gap-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-emerald-400 font-bold">[EXEC] BUY EUR/USD</span>
+                        <span className="text-zinc-400">Lot: 4.00 @ 1.0825</span>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end space-x-3 text-[10px] sm:text-[11px]">
+                        <span className="text-zinc-400">SL: 1.0805 | TP: 1.0870</span>
+                        <span className="text-emerald-400 font-bold">+$480.00 (+0.9%)</span>
+                        <span className="text-zinc-500 hidden md:inline">ICMarkets-Server4</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-zinc-300 bg-[#121624] px-3 py-1.5 rounded">
-                      <span className="text-cyan-400 font-bold">[SIGNAL] REGIME SHIFT</span>
-                      <span>NAS100: Trend confirmation above VWAP</span>
-                      <span className="text-zinc-400">R:R Ratio 1:3.2</span>
-                      <span className="text-cyan-300">Consensus Confirmed</span>
-                      <span className="text-[10px] text-zinc-500">Algo Meta-Engine</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between text-zinc-300 bg-[#121624] p-2.5 sm:px-3 sm:py-1.5 rounded gap-1 sm:gap-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-cyan-400 font-bold">[SIGNAL] REGIME SHIFT</span>
+                        <span className="text-zinc-300">NAS100: Trend above VWAP</span>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end space-x-3 text-[10px] sm:text-[11px]">
+                        <span className="text-zinc-400">R:R 1:3.2</span>
+                        <span className="text-cyan-300 font-medium">Consensus</span>
+                        <span className="text-zinc-500 hidden md:inline">Algo Meta-Engine</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -697,7 +645,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <h2 className="text-2xl sm:text-3xl font-bold text-white">Why Algorithmic Execution Outperforms</h2>
         </div>
 
-        <div className="rounded-2xl border border-[#202534] bg-[#0E121B] overflow-x-auto shadow-xl">
+        <div className="rounded-2xl border border-[#202534] bg-[#0E121B] overflow-x-auto shadow-xl scrollbar-thin">
+          <p className="sm:hidden text-center text-[10px] text-zinc-500 font-mono py-1.5 bg-[#121622] border-b border-[#1E2332]">
+            ← Scroll horizontally to compare all platforms →
+          </p>
           <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[620px]">
             <thead>
               <tr className="border-b border-[#1E2332] bg-[#121622] font-mono text-zinc-400 text-xs">

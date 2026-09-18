@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Activity, Database, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkbookView } from './components/WorkbookView';
@@ -13,7 +14,9 @@ import { AdminDashboardView } from './components/AdminDashboardView';
 import { TradeExplanationModal } from './components/TradeExplanationModal';
 import { LiveTradingConfirmationModal } from './components/LiveTradingConfirmationModal';
 import { EnterpriseAuthModal } from './components/EnterpriseAuthModal';
+import { OfflineWealthReportModal } from './components/OfflineWealthReportModal';
 import { LandingPageView } from './components/LandingPageView';
+import { MarketTickerRibbon } from './components/MarketTickerRibbon';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { firestoreSync } from './services/firestoreSync';
 import { QuantaraLogoMark } from './components/QuantaraLogo';
@@ -24,6 +27,7 @@ import {
   BrokerAccount,
   MarketAsset,
   NotificationItem,
+  OfflineSessionStats,
   Order,
   PortfolioSummary,
   Position,
@@ -38,6 +42,13 @@ function QuantaraApp() {
   const { user, profile, cloudSyncStatus } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('landing');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  // Automatically switch away from landing page when a user signs in (landing page is only visible to guests who are not signed in)
+  useEffect(() => {
+    if (user && currentTab === 'landing') {
+      setCurrentTab('dashboard');
+    }
+  }, [user, currentTab]);
 
   // Core Application State
   const [botState, setBotState] = useState<BotState>({
@@ -105,13 +116,23 @@ function QuantaraApp() {
   // Modal State
   const [explanationTarget, setExplanationTarget] = useState<{ id: string; data?: any } | null>(null);
   const [showLiveConfirmation, setShowLiveConfirmation] = useState(false);
+  const [offlineReport, setOfflineReport] = useState<OfflineSessionStats | null>(null);
+  const [showOfflineReportModal, setShowOfflineReportModal] = useState<boolean>(false);
 
-  // Subscribe to Realtime Server-Sent Events (SSE)
+  // Subscribe to Realtime Server-Sent Events (SSE) & 24/7 Engine State
   useEffect(() => {
-    // Load initial strategy metadata and live market assets immediately
+    // Load initial strategy metadata, live market assets, and 24/7 offline report immediately
     api.getStrategies().then(setStrategies).catch(console.warn);
     api.getAuditLogs().then(setAuditLogs).catch(console.warn);
     api.getMarketAssets().then(setAssets).catch(console.warn);
+    api.getOfflineReport().then((res) => {
+      if (res && res.offlineReport) {
+        setOfflineReport(res.offlineReport);
+        if (res.offlineReport.hasUnseenReport) {
+          setShowOfflineReportModal(true);
+        }
+      }
+    }).catch(console.warn);
 
     // Reliable fallback poll every 2.5s for live price freshness
     const pollInterval = setInterval(() => {
@@ -136,6 +157,12 @@ function QuantaraApp() {
           if (data.assets) setAssets(data.assets);
           if (data.riskSettings) setRiskSettings(data.riskSettings);
           if (data.brokerAccounts) setBrokerAccounts(data.brokerAccounts);
+          if (data.offlineSessionStats) {
+            setOfflineReport(data.offlineSessionStats);
+            if (data.offlineSessionStats.hasUnseenReport) {
+              setShowOfflineReportModal(true);
+            }
+          }
         } catch (err) {
           console.error('Error parsing SSE snapshot:', err);
         }
@@ -155,6 +182,18 @@ function QuantaraApp() {
     };
   }, []);
 
+  const handleDismissOfflineReport = async () => {
+    setShowOfflineReportModal(false);
+    try {
+      await api.dismissOfflineReport();
+      if (offlineReport) {
+        setOfflineReport({ ...offlineReport, hasUnseenReport: false });
+      }
+    } catch (e) {
+      console.warn('Failed to dismiss offline report', e);
+    }
+  };
+
   // Sync with Firestore Cloud Database for authenticated user
   useEffect(() => {
     if (!user?.uid) return;
@@ -170,6 +209,8 @@ function QuantaraApp() {
     const unsubBrokers = firestoreSync.subscribeBrokers(user.uid, (cloudBrokers) => {
       if (cloudBrokers && cloudBrokers.length > 0) {
         setBrokerAccounts(cloudBrokers);
+        // Sync with backend engine so server runs non-stop on these accounts
+        api.syncBrokerAccounts(cloudBrokers).catch(console.warn);
       }
     });
 
@@ -178,6 +219,35 @@ function QuantaraApp() {
       unsubBrokers();
     };
   }, [user?.uid]);
+
+  // LocalStorage backup for accounts so connected accounts persist locally and sync to server
+  useEffect(() => {
+    if (brokerAccounts.length > 0) {
+      try {
+        localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(brokerAccounts));
+      } catch (e) {
+        console.warn('Storage save warning:', e);
+      }
+    }
+  }, [brokerAccounts]);
+
+  // Initial cold-start check: if server has no accounts, hydrate from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('quantara_connected_accounts_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          api.syncBrokerAccounts(parsed).then((res) => {
+            if (res?.accounts?.length) setBrokerAccounts(res.accounts);
+            if (res?.botState) setBotState(res.botState);
+          }).catch(console.warn);
+        }
+      }
+    } catch (e) {
+      console.warn('Storage restore warning:', e);
+    }
+  }, []);
 
   // Sync trade history items into user's private Firestore journal
   const syncedTradeIdsRef = useRef<Set<string>>(new Set());
@@ -360,15 +430,61 @@ function QuantaraApp() {
 
   const handleDisconnectBroker = async (id: string) => {
     const res = await api.disconnectBroker(id);
+    if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
+    if (res?.botState) setBotState(res.botState);
     if (user?.uid) {
       firestoreSync.deleteBrokerProfile(user.uid, id).catch(console.warn);
       firestoreSync.appendAuditLog(user.uid, {
-        action: 'DISCONNECT_BROKER',
+        action: 'DELETE_SERVER',
         category: 'BROKER',
         details: { brokerId: id },
         severity: 'WARN',
       }).catch(console.warn);
     }
+    return res;
+  };
+
+  const handlePauseBrokerServer = async (id: string) => {
+    const res = await api.pauseBrokerServer(id);
+    if (res?.account) {
+      setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
+      if (res.botState) setBotState(res.botState);
+      if (user?.uid) firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+    }
+    return res;
+  };
+
+  const handleResumeBrokerServer = async (id: string) => {
+    const res = await api.resumeBrokerServer(id);
+    if (res?.account) {
+      setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
+      if (res.botState) setBotState(res.botState);
+      if (user?.uid) firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+    }
+    return res;
+  };
+
+  const handleStopBrokerServer = async (id: string) => {
+    const res = await api.stopBrokerServer(id);
+    if (res?.account) {
+      setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
+      if (res.botState) setBotState(res.botState);
+      if (user?.uid) firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+    }
+    return res;
+  };
+
+  const handlePauseAllServers = async () => {
+    const res = await api.pauseAllServers();
+    if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
+    if (res?.botState) setBotState(res.botState);
+    return res;
+  };
+
+  const handleRunAllServers = async () => {
+    const res = await api.runAllServersNonStop();
+    if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
+    if (res?.botState) setBotState(res.botState);
     return res;
   };
 
@@ -444,6 +560,7 @@ function QuantaraApp() {
         botState={botState}
         riskSettings={riskSettings}
         notifications={notifications}
+        offlineSessionStats={offlineReport || botState.offlineSessionStats}
         onToggleBot={handleToggleBot}
         onToggleTakeover={handleToggleTakeover}
         onTriggerKillSwitch={handleTriggerKillSwitch}
@@ -451,18 +568,31 @@ function QuantaraApp() {
         onSwitchToPaper={handleSwitchToPaper}
         onMarkNotificationsRead={handleMarkNotificationsRead}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenOfflineReport={() => setShowOfflineReportModal(true)}
+      />
+
+      {/* Real-Time Top Market Price Ticker Ribbon (Visible permanently across all views, before and upon signin) */}
+      <MarketTickerRibbon
+        assets={assets}
+        onSelectSymbol={(symbol) => {
+          if (user) {
+            setCurrentTab('dashboard');
+          }
+        }}
       />
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-24 md:pb-8 space-y-6">
-        {currentTab === 'landing' && (
+        {/* Landing Page: strictly visible only when NOT signed in */}
+        {!user && currentTab === 'landing' && (
           <LandingPageView
             onNavigateTab={setCurrentTab}
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
           />
         )}
 
-        {currentTab === 'dashboard' && (
+        {/* Dashboard / Institutional Terminal (Default home view once signed in) */}
+        {(currentTab === 'dashboard' || (user && currentTab === 'landing')) && (
           <DashboardView
             portfolio={portfolio}
             botState={botState}
@@ -547,6 +677,7 @@ function QuantaraApp() {
             orders={orders}
             portfolio={portfolio}
             assets={assets}
+            botState={botState}
             onLoginMT5={handleLoginMT5Broker}
             onUpdateMT5Control={handleUpdateMT5Control}
             onCloseAllMT5={handleCloseAllMT5}
@@ -557,6 +688,11 @@ function QuantaraApp() {
             onSelectActiveBroker={handleSelectActiveBroker}
             onRenameBroker={handleRenameBroker}
             onToggleTakeover={handleToggleTakeover}
+            onPauseServer={handlePauseBrokerServer}
+            onResumeServer={handleResumeBrokerServer}
+            onStopServer={handleStopBrokerServer}
+            onPauseAllServers={handlePauseAllServers}
+            onRunAllServers={handleRunAllServers}
           />
         )}
 
@@ -593,6 +729,23 @@ function QuantaraApp() {
       <EnterpriseAuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={() => {
+          setCurrentTab('dashboard');
+        }}
+        onSignOutSuccess={() => {
+          setCurrentTab('landing');
+        }}
+      />
+
+      {/* 24/7 Autonomous Wealth Generation Offline Report Modal */}
+      <OfflineWealthReportModal
+        isOpen={showOfflineReportModal}
+        onClose={handleDismissOfflineReport}
+        report={offlineReport || botState.offlineSessionStats || null}
+        isEngineRunning={botState.isRunning}
+        onPauseBot={handleToggleBot}
+        onResumeBot={handleToggleBot}
+        onViewJournal={() => setCurrentTab('workbook')}
       />
 
       {/* Global Status Bar Footer */}
@@ -618,6 +771,94 @@ function QuantaraApp() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Sticky Bottom Navigation Dock (md:hidden) */}
+      <nav className="fixed bottom-0 inset-x-0 z-40 bg-[#0E0E11]/95 backdrop-blur-lg border-t border-[#1F1F23] md:hidden px-1.5 py-1.5 flex items-center justify-around text-[10px] font-mono shadow-2xl safe-area-bottom">
+        {!user && (
+          <button
+            type="button"
+            onClick={() => setCurrentTab('landing')}
+            className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+              currentTab === 'landing' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+            }`}
+          >
+            <Sparkles className="h-4 w-4 mb-0.5" />
+            <span className="truncate">Overview</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('dashboard')}
+          className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+            currentTab === 'dashboard' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+          }`}
+        >
+          <Activity className="h-4 w-4 mb-0.5" />
+          <span className="truncate">Terminal</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('brokers')}
+          className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors relative ${
+            currentTab === 'brokers' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+          }`}
+        >
+          <div className="relative">
+            <Database className="h-4 w-4 mb-0.5" />
+            {brokerAccounts.some((b) => b.serverStatus === 'RUNNING' || b.status === 'RUNNING' || b.status === 'CONNECTED') && (
+              <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0E0E11] animate-pulse" />
+            )}
+          </div>
+          <span className="truncate">MT5 / Brokers</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('compounding')}
+          className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+            currentTab === 'compounding' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+          }`}
+        >
+          <TrendingUp className="h-4 w-4 mb-0.5" />
+          <span className="truncate">$10 Wealth</span>
+        </button>
+
+        {user && (
+          <button
+            type="button"
+            onClick={() => setCurrentTab('engine')}
+            className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+              currentTab === 'engine' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+            }`}
+          >
+            <Zap className="h-4 w-4 mb-0.5" />
+            <span className="truncate">Engine</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setIsAuthModalOpen(true)}
+          className="flex-1 flex flex-col items-center py-1 px-1 rounded-lg text-[#8E9299] hover:text-white transition-colors"
+          title="Profile & Picture Settings"
+        >
+          <div className="h-4 w-4 rounded-full overflow-hidden mb-0.5 border border-blue-400/40 bg-blue-500/20 flex items-center justify-center text-[8px] font-bold text-blue-300">
+            {profile?.photoURL || user?.photoURL ? (
+              <img
+                src={profile?.photoURL || user?.photoURL}
+                alt="Avatar"
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <User className="h-2.5 w-2.5" />
+            )}
+          </div>
+          <span className="truncate">Profile</span>
+        </button>
+      </nav>
     </div>
   );
 }

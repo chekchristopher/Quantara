@@ -223,6 +223,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfile = async (data: {
+    displayName?: string;
+    photoURL?: string;
+    role?: any;
+    bio?: string;
+    desk?: string;
+  }) => {
+    setAuthError(null);
+    try {
+      const activeUid = user?.uid || profile?.uid || 'anonymous-user';
+      setCloudSyncStatus('syncing');
+
+      // Update Firebase Auth current user if applicable
+      if (auth.currentUser) {
+        const fbUpdate: { displayName?: string; photoURL?: string } = {};
+        if (data.displayName !== undefined) fbUpdate.displayName = data.displayName;
+        // Firebase Auth photoURL max length is typically 2048, so only set if reasonable length
+        if (data.photoURL !== undefined && data.photoURL.length < 2000) {
+          fbUpdate.photoURL = data.photoURL;
+        }
+        if (Object.keys(fbUpdate).length > 0) {
+          try {
+            await updateProfile(auth.currentUser, fbUpdate);
+          } catch (e) {
+            console.warn('Could not update Auth user profile directly:', e);
+          }
+        }
+      }
+
+      // Sync with Firestore database
+      const updated = await firestoreSync.updateUserProfileData(activeUid, data);
+      setProfile(updated);
+
+      // Cache locally for offline and instant refresh
+      try {
+        localStorage.setItem('quantara_custom_profile', JSON.stringify(updated));
+      } catch (e) {}
+
+      // Update React state user object so avatar updates in realtime
+      if (user) {
+        setUser((prev) => {
+          if (!prev) return null;
+          return Object.assign(Object.create(Object.getPrototypeOf(prev)), prev, {
+            displayName: data.displayName !== undefined ? data.displayName : prev.displayName,
+            photoURL: data.photoURL !== undefined ? data.photoURL : prev.photoURL,
+          });
+        });
+      }
+
+      setCloudSyncStatus('synced');
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      setCloudSyncStatus('offline');
+      setAuthError(err.message || 'Failed to update operator profile.');
+      throw err;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -237,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         sendPasswordReset,
         resendVerification,
+        updateUserProfile,
         clearError,
       }}
     >
