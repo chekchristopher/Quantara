@@ -129,6 +129,7 @@ export interface Position {
   userId: string;
   symbol: string;
   side: PositionSide;
+  lotSize: number; // Institutional MT5 lot size (strictly between 0.01 and 0.10 depending on equity)
   size: number; // quantity
   sizeUsd: number;
   entryPrice: number;
@@ -144,6 +145,10 @@ export interface Position {
   openedAt: number;
   environment: EnvironmentMode;
   explanationId?: string;
+  serverId?: string;
+  serverName?: string;
+  accountNumber?: string;
+  brokerName?: string;
 }
 
 export interface Order {
@@ -153,6 +158,7 @@ export interface Order {
   type: OrderType;
   side: PositionSide;
   direction: 'BUY' | 'SELL';
+  lotSize?: number; // Institutional lot size (0.01 - 0.10)
   quantity: number;
   price: number;
   stopPrice?: number;
@@ -166,12 +172,16 @@ export interface Order {
   environment: EnvironmentMode;
   strategyName: string;
   idempotencyKey: string;
+  serverId?: string;
+  serverName?: string;
+  accountNumber?: string;
 }
 
 export interface TradeHistoryItem {
   id: string;
   symbol: string;
   side: PositionSide;
+  lotSize?: number; // Institutional lot size taken (0.01 - 0.10)
   entryPrice: number;
   exitPrice: number;
   quantity: number;
@@ -180,6 +190,10 @@ export interface TradeHistoryItem {
   feesPaid: number;
   strategyName: string;
   accountName?: string;
+  serverId?: string;
+  serverName?: string;
+  accountNumber?: string;
+  brokerName?: string;
   entryTime: number;
   exitTime: number;
   exitReason: 'TAKE_PROFIT' | 'STOP_LOSS' | 'TRAILING_STOP' | 'KILL_SWITCH' | 'MANUAL' | 'SIGNAL_REVERSAL';
@@ -314,6 +328,69 @@ export interface BrokerAccount {
   lastExecutionTick?: number;
   tradesCount?: number;
   pnlRealized?: number;
+  // Enterprise Connected Server & Firebase Security Metadata
+  serverHost?: string;
+  protocol?: string;
+  encryptionLevel?: string;
+  securityHash?: string;
+  isSecuredInFirebase?: boolean;
+  lastCloudSyncTimestamp?: number;
+  winningTradesCount?: number;
+  losingTradesCount?: number;
+  winRatePercent?: number;
+  profitFactor?: number;
+  lotsTradedTotal?: number;
+  peakBalance?: number;
+  drawdownPercent?: number;
+}
+
+export interface ServerAccountReport {
+  id: string;
+  serverId: string;
+  serverName: string;
+  broker: string;
+  accountNumber: string;
+  accountType: 'REAL' | 'DEMO';
+  currency: string;
+  leverage: string;
+  generatedAt: number;
+  serverTelemetry: {
+    host: string;
+    protocol: string;
+    pingMs: number;
+    encryption: string;
+    status: string;
+    uptimeHours: number;
+    securityHash: string;
+    cloudDatabase: string;
+    isSecuredInFirebase: boolean;
+    lastSyncedAt: number;
+  };
+  financialSummary: {
+    initialBalance: number;
+    currentBalance: number;
+    totalEquity: number;
+    netProfitUsd: number;
+    returnPercent: number;
+    peakBalance: number;
+    freeMargin: number;
+    marginLevel: number;
+    maxDrawdownPercent: number;
+  };
+  executionSummary: {
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    winRatePercent: number;
+    profitFactor: number;
+    averageWinUsd: number;
+    averageLossUsd: number;
+    bestTradeUsd: number;
+    worstTradeUsd: number;
+    totalLotsTraded: number;
+    averageLotSize: number;
+  };
+  trades: TradeHistoryItem[];
 }
 
 export interface NotificationItem {

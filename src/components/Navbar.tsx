@@ -121,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
     {
       id: 'brokers',
-      label: 'MT5 & Broker Login',
-      desc: 'MetaTrader 5 bridge, demo broker accounts & direct liquidity feeds',
+      label: 'MT5 Servers & Reports',
+      desc: 'Connected servers, automated trade reports & encrypted Firebase sync',
       category: 'Core Terminal',
       icon: Database,
     },
@@ -244,27 +244,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </button>
 
-            {/* Engine 24/7 Cloud Status Button */}
+            {/* Engine Status & Time */}
             <div className="hidden lg:flex items-center pl-3 border-l border-[#1F1F23] space-x-2.5">
-              <button
-                onClick={onOpenOfflineReport}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-                  botState.isRunning
-                    ? 'bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981] hover:bg-[#10B981]/25 shadow-sm shadow-emerald-950/20'
-                    : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20'
-                }`}
-                title="24/7 Autonomous Cloud Engine: Click to open Wealth Generation Report"
-              >
-                <div className={`w-2 h-2 rounded-full ${botState.isRunning ? 'bg-[#10B981] animate-pulse' : 'bg-yellow-400'}`} />
-                <span className="text-[11px] font-mono font-bold tracking-tight">
-                  {botState.isRunning ? '24/7 CLOUD ACTIVE' : 'ENGINE PAUSED'}
+              <div className="flex items-center space-x-1.5 text-[#8E9299]">
+                <div className={`w-1.5 h-1.5 rounded-full ${botState.isRunning ? 'bg-[#10B981]' : 'bg-yellow-400'}`} />
+                <span className="text-[11px] font-mono">
+                  {botState.isRunning ? 'ACTIVE' : 'PAUSED'}
                 </span>
-                {offlineSessionStats?.realizedPnlOffline ? (
-                  <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded border border-emerald-500/30">
-                    +{offlineSessionStats.realizedPnlOffline >= 0 ? '$' : '-$'}{Math.abs(offlineSessionStats.realizedPnlOffline).toFixed(2)}
-                  </span>
-                ) : null}
-              </button>
+              </div>
               <span className="font-mono text-[11px] text-[#8E9299]">{timeUtc}</span>
             </div>
           </div>
@@ -608,44 +595,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span>{botState.isRunning ? 'LIVE' : 'PAUSED'}</span>
                   </button>
                 </div>
-              </div>
-
-              {/* 24/7 Cloud Background Execution Card */}
-              <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-[#0D1624] to-[#0A101C] p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${botState.isRunning ? 'bg-emerald-400 opacity-75' : 'bg-yellow-400 opacity-75'}`} />
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${botState.isRunning ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
-                    </span>
-                    <span className="text-[11px] font-tech font-bold uppercase tracking-wider text-emerald-300">
-                      24/7 Autonomous Server
-                    </span>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {botState.isRunning ? 'RUNNING NON-STOP' : 'PAUSED'}
-                  </span>
-                </div>
-                <p className="text-[10px] text-zinc-300 font-mono leading-relaxed">
-                  Trades execute automatically around the clock even when you are offline or your browser is closed. The engine continuously compounds wealth until you choose to stop it.
-                </p>
-                {onOpenOfflineReport && (
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onOpenOfflineReport();
-                    }}
-                    className="w-full py-1.5 rounded-lg bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 text-emerald-200 text-xs font-mono font-bold transition-all flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>View 24/7 Wealth Report</span>
-                    {offlineSessionStats?.realizedPnlOffline ? (
-                      <span className="text-emerald-400 font-extrabold">
-                        (+${offlineSessionStats.realizedPnlOffline.toFixed(2)})
-                      </span>
-                    ) : null}
-                  </button>
-                )}
               </div>
             </div>
 

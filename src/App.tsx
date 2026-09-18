@@ -506,6 +506,17 @@ function QuantaraApp() {
     return res;
   };
 
+  const handleRefreshData = async () => {
+    try {
+      const brokers = await api.getBrokerAccounts();
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+      const assetsRes = await api.getMarketAssets();
+      if (Array.isArray(assetsRes)) setAssets(assetsRes);
+    } catch (e) {
+      console.warn('Refresh error', e);
+    }
+  };
+
   const handleRunTests = async () => {
     return api.runAutomatedTests();
   };
@@ -677,7 +688,9 @@ function QuantaraApp() {
             orders={orders}
             portfolio={portfolio}
             assets={assets}
-            botState={botState}
+            tradesHistory={tradesHistory}
+            user={user}
+            onRefreshData={handleRefreshData}
             onLoginMT5={handleLoginMT5Broker}
             onUpdateMT5Control={handleUpdateMT5Control}
             onCloseAllMT5={handleCloseAllMT5}

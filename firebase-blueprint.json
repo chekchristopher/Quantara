@@ -43,7 +43,7 @@
     },
     "UserBrokerProfile": {
       "title": "UserBrokerProfile",
-      "description": "Connected MT5 or institutional broker account configuration.",
+      "description": "Connected MT5 or institutional broker account configuration and secure server link.",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
@@ -51,22 +51,90 @@
         "brokerName": { "type": "string", "maxLength": 128 },
         "accountNumber": { "type": "string", "maxLength": 64 },
         "server": { "type": "string", "maxLength": 128 },
+        "serverHost": { "type": "string", "maxLength": 128 },
+        "protocol": { "type": "string", "maxLength": 32 },
+        "encryptionLevel": { "type": "string", "maxLength": 64 },
+        "securityHash": { "type": "string", "maxLength": 128 },
         "platform": { "type": "string", "maxLength": 32 },
         "environment": { "type": "string", "maxLength": 32 },
         "status": { "type": "string", "maxLength": 32 },
         "balance": { "type": "number" },
         "equity": { "type": "number" },
         "currency": { "type": "string", "maxLength": 16 },
-        "leverage": { "type": "number" },
+        "leverage": { "type": "string", "maxLength": 32 },
         "isCompoundingActive": { "type": "boolean" },
         "serverStatus": { "type": "string", "maxLength": 32 },
         "isNonStop": { "type": "boolean" },
         "savedInSystem": { "type": "boolean" },
+        "isSecuredInFirebase": { "type": "boolean" },
         "uptimeSeconds": { "type": "number" },
+        "totalTradesExecuted": { "type": "number" },
+        "winningTradesCount": { "type": "number" },
+        "losingTradesCount": { "type": "number" },
+        "winRatePercent": { "type": "number" },
+        "profitFactor": { "type": "number" },
+        "lotsTradedTotal": { "type": "number" },
+        "netRealizedPnl": { "type": "number" },
         "createdAt": { "type": "string", "maxLength": 64 },
         "updatedAt": { "type": "string", "maxLength": 64 }
       },
-      "required": ["id", "userId", "brokerName", "accountNumber", "server", "platform", "environment", "status", "createdAt", "updatedAt"]
+      "required": ["id", "userId", "brokerName", "accountNumber", "server", "status", "createdAt", "updatedAt"]
+    },
+    "UserServerTrade": {
+      "title": "UserServerTrade",
+      "description": "Chronological trade execution performed on a specific connected broker server.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "serverId": { "type": "string", "maxLength": 128 },
+        "serverName": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 64 },
+        "symbol": { "type": "string", "maxLength": 32 },
+        "side": { "type": "string", "maxLength": 16 },
+        "lotSize": { "type": "number" },
+        "quantity": { "type": "number" },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "realizedPnl": { "type": "number" },
+        "realizedPnlPercent": { "type": "number" },
+        "feesPaid": { "type": "number" },
+        "strategyName": { "type": "string", "maxLength": 128 },
+        "exitReason": { "type": "string", "maxLength": 32 },
+        "tradeExplanation": { "type": "string", "maxLength": 1024 },
+        "entryTime": { "type": "string", "maxLength": 64 },
+        "exitTime": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "serverId", "symbol", "side", "entryPrice", "exitPrice", "realizedPnl", "createdAt"]
+    },
+    "UserServerReport": {
+      "title": "UserServerReport",
+      "description": "Institutional account report detailing all performance and trade executions for a connected server.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "serverId": { "type": "string", "maxLength": 128 },
+        "serverName": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 64 },
+        "generatedAt": { "type": "string", "maxLength": 64 },
+        "initialBalance": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "totalEquity": { "type": "number" },
+        "netProfitUsd": { "type": "number" },
+        "returnPercent": { "type": "number" },
+        "totalTrades": { "type": "number" },
+        "winningTrades": { "type": "number" },
+        "losingTrades": { "type": "number" },
+        "winRatePercent": { "type": "number" },
+        "profitFactor": { "type": "number" },
+        "totalLotsTraded": { "type": "number" },
+        "averageLotSize": { "type": "number" },
+        "maxDrawdownPercent": { "type": "number" },
+        "reportSummary": { "type": "string", "maxLength": 2048 }
+      },
+      "required": ["id", "userId", "serverId", "serverName", "accountNumber", "generatedAt", "totalTrades", "netProfitUsd"]
     },
     "UserTradingJournal": {
       "title": "UserTradingJournal",
@@ -120,6 +188,14 @@
     "/users/{userId}/brokers/{brokerId}": {
       "schema": "UserBrokerProfile",
       "description": "MT5 and broker profiles connected to the user's workspace."
+    },
+    "/users/{userId}/brokers/{brokerId}/trades/{tradeId}": {
+      "schema": "UserServerTrade",
+      "description": "Complete audit trail of all trades executed for this connected server."
+    },
+    "/users/{userId}/brokers/{brokerId}/reports/{reportId}": {
+      "schema": "UserServerReport",
+      "description": "Comprehensive enterprise account reports generated for this connected server."
     },
     "/users/{userId}/journal/{tradeId}": {
       "schema": "UserTradingJournal",

@@ -83,6 +83,9 @@ service cloud.firestore {
         (!('balance' in data) || data.balance is number) &&
         (!('simulatedBalance' in data) || data.simulatedBalance is number) &&
         (!('equity' in data) || data.equity is number) &&
+        (!('freeMargin' in data) || data.freeMargin is number) &&
+        (!('marginLevel' in data) || data.marginLevel is number) &&
+        (!('pingMs' in data) || data.pingMs is number) &&
         (!('currency' in data) || (data.currency is string && data.currency.size() <= 16)) &&
         (!('leverage' in data) || (data.leverage is string && data.leverage.size() <= 32) || data.leverage is number) &&
         (!('isCompoundingActive' in data) || data.isCompoundingActive is bool) &&
@@ -96,12 +99,74 @@ service cloud.firestore {
         (!('serverStatus' in data) || (data.serverStatus is string && data.serverStatus.size() <= 32)) &&
         (!('isNonStop' in data) || data.isNonStop is bool) &&
         (!('savedInSystem' in data) || data.savedInSystem is bool) &&
+        (!('isSecuredInFirebase' in data) || data.isSecuredInFirebase is bool) &&
         (!('uptimeSeconds' in data) || data.uptimeSeconds is number) &&
         (!('connectedAt' in data) || data.connectedAt is number) &&
         (!('tradesCount' in data) || data.tradesCount is number) &&
         (!('pnlRealized' in data) || data.pnlRealized is number) &&
+        (!('serverHost' in data) || (data.serverHost is string && data.serverHost.size() <= 128)) &&
+        (!('protocol' in data) || (data.protocol is string && data.protocol.size() <= 32)) &&
+        (!('encryptionLevel' in data) || (data.encryptionLevel is string && data.encryptionLevel.size() <= 64)) &&
+        (!('securityHash' in data) || (data.securityHash is string && data.securityHash.size() <= 128)) &&
+        (!('lastCloudSyncTimestamp' in data) || data.lastCloudSyncTimestamp is number) &&
+        (!('winningTradesCount' in data) || data.winningTradesCount is number) &&
+        (!('losingTradesCount' in data) || data.losingTradesCount is number) &&
+        (!('winRatePercent' in data) || data.winRatePercent is number) &&
+        (!('profitFactor' in data) || data.profitFactor is number) &&
+        (!('lotsTradedTotal' in data) || data.lotsTradedTotal is number) &&
+        (!('netRealizedPnl' in data) || data.netRealizedPnl is number) &&
+        (!('peakBalance' in data) || data.peakBalance is number) &&
+        (!('drawdownPercent' in data) || data.drawdownPercent is number) &&
         data.createdAt is string && data.createdAt.size() <= 64 &&
         data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidServerTrade(data) {
+      return data.keys().hasAll(['id', 'userId', 'serverId', 'symbol', 'side', 'entryPrice', 'exitPrice', 'realizedPnl', 'createdAt']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.serverId is string && data.serverId.size() <= 128 &&
+        (!('serverName' in data) || (data.serverName is string && data.serverName.size() <= 128)) &&
+        (!('accountNumber' in data) || (data.accountNumber is string && data.accountNumber.size() <= 64)) &&
+        data.symbol is string && data.symbol.size() <= 32 &&
+        data.side is string && data.side.size() <= 16 &&
+        (!('lotSize' in data) || data.lotSize is number) &&
+        (!('quantity' in data) || data.quantity is number) &&
+        data.entryPrice is number &&
+        data.exitPrice is number &&
+        data.realizedPnl is number &&
+        (!('realizedPnlPercent' in data) || data.realizedPnlPercent is number) &&
+        (!('feesPaid' in data) || data.feesPaid is number) &&
+        (!('strategyName' in data) || (data.strategyName is string && data.strategyName.size() <= 128)) &&
+        (!('exitReason' in data) || (data.exitReason is string && data.exitReason.size() <= 32)) &&
+        (!('tradeExplanation' in data) || (data.tradeExplanation is string && data.tradeExplanation.size() <= 1024)) &&
+        (!('entryTime' in data) || (data.entryTime is string && data.entryTime.size() <= 64)) &&
+        (!('exitTime' in data) || (data.exitTime is string && data.exitTime.size() <= 64)) &&
+        data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
+    function isValidServerReport(data) {
+      return data.keys().hasAll(['id', 'userId', 'serverId', 'serverName', 'accountNumber', 'generatedAt', 'totalTrades', 'netProfitUsd']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.serverId is string && data.serverId.size() <= 128 &&
+        data.serverName is string && data.serverName.size() <= 128 &&
+        data.accountNumber is string && data.accountNumber.size() <= 64 &&
+        data.generatedAt is string && data.generatedAt.size() <= 64 &&
+        (!('initialBalance' in data) || data.initialBalance is number) &&
+        (!('currentBalance' in data) || data.currentBalance is number) &&
+        (!('totalEquity' in data) || data.totalEquity is number) &&
+        data.netProfitUsd is number &&
+        (!('returnPercent' in data) || data.returnPercent is number) &&
+        data.totalTrades is number &&
+        (!('winningTrades' in data) || data.winningTrades is number) &&
+        (!('losingTrades' in data) || data.losingTrades is number) &&
+        (!('winRatePercent' in data) || data.winRatePercent is number) &&
+        (!('profitFactor' in data) || data.profitFactor is number) &&
+        (!('totalLotsTraded' in data) || data.totalLotsTraded is number) &&
+        (!('averageLotSize' in data) || data.averageLotSize is number) &&
+        (!('maxDrawdownPercent' in data) || data.maxDrawdownPercent is number) &&
+        (!('reportSummary' in data) || (data.reportSummary is string && data.reportSummary.size() <= 2048));
     }
 
     function isValidTradingJournal(data) {
@@ -200,6 +265,46 @@ service cloud.firestore {
           isValidBrokerProfile(incoming());
 
         allow delete: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId);
+
+        // Subcollection: Executed Trades for Connected Server
+        match /trades/{tradeId} {
+          allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(tradeId);
+          allow list: if isSignedIn() && isOwner(userId);
+
+          allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+            isValidId(userId) && isValidId(brokerId) && isValidId(tradeId) &&
+            incoming().userId == userId &&
+            incoming().serverId == brokerId &&
+            isValidServerTrade(incoming());
+
+          allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+            isValidId(userId) && isValidId(brokerId) && isValidId(tradeId) &&
+            incoming().userId == userId &&
+            incoming().id == existing().id &&
+            isValidServerTrade(incoming());
+
+          allow delete: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(tradeId);
+        }
+
+        // Subcollection: Account Reports for Connected Server
+        match /reports/{reportId} {
+          allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(reportId);
+          allow list: if isSignedIn() && isOwner(userId);
+
+          allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+            isValidId(userId) && isValidId(brokerId) && isValidId(reportId) &&
+            incoming().userId == userId &&
+            incoming().serverId == brokerId &&
+            isValidServerReport(incoming());
+
+          allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+            isValidId(userId) && isValidId(brokerId) && isValidId(reportId) &&
+            incoming().userId == userId &&
+            incoming().id == existing().id &&
+            isValidServerReport(incoming());
+
+          allow delete: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(reportId);
+        }
       }
 
       // Subcollection: Trading Journal & Performance

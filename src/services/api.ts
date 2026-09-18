@@ -392,4 +392,14 @@ export const api = {
     const res = await fetch('/api/offline-report/dismiss', { method: 'POST' });
     return res.json();
   },
+
+  async getServerReport(brokerId: string): Promise<any> {
+    const res = await fetch(`/api/brokers/${brokerId}/report`);
+    return res.json();
+  },
+
+  async getEnterpriseReport(): Promise<any> {
+    const res = await fetch('/api/reports/enterprise');
+    return res.json();
+  },
 };

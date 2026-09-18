@@ -440,6 +440,13 @@ export const WorkbookView: React.FC<WorkbookViewProps> = ({ onNavigateTab }) => 
                     ))}
                   </div>
 
+                  {/* Code or Formula Snippet (if present) */}
+                  {section.codeOrFormula && (
+                    <div className="rounded-xl border border-[#26262F] bg-[#0A0A0E] p-3.5 my-3 font-mono text-xs text-blue-300 overflow-x-auto whitespace-pre leading-relaxed shadow-inner">
+                      <code>{section.codeOrFormula}</code>
+                    </div>
+                  )}
+
                   {/* Section Callout (if present) */}
                   {section.callout && (
                     <div

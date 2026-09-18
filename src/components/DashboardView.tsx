@@ -54,6 +54,7 @@ import {
   TradeHistoryItem,
   TradingMode,
 } from '../types';
+import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
 
 interface DashboardViewProps {
   portfolio: PortfolioSummary;
@@ -1177,12 +1178,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 3. ACTIVE OPEN POSITIONS TABLE */}
       <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
-          <div className="flex items-center space-x-2">
-            <Activity className="h-4 w-4 text-blue-400" />
-            <span className="text-sm font-semibold uppercase tracking-wider text-white">
-              Active Open Positions ({positions.length})
-            </span>
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#1F1F23]">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center space-x-2">
+              <Activity className="h-4 w-4 text-blue-400" />
+              <span className="text-sm font-semibold uppercase tracking-wider text-white">
+                Active Open Positions ({positions.length})
+              </span>
+            </div>
+            {/* Strict Risk Management Lot Sizing Pill */}
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 font-mono text-[11px]">
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <span className="font-semibold">Risk Policy: 0.01 – 0.10 Lots</span>
+              <span className="text-amber-400/60">•</span>
+              <span>Tier: <strong className="text-white">{calculateEquityLotSize(portfolio.totalEquity).toFixed(2)} Lots</strong> @ ${portfolio.totalEquity.toFixed(0)} Eq</span>
+            </div>
           </div>
           {positions.length > 0 && (
             <button
@@ -1196,7 +1206,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {positions.length === 0 ? (
           <div className="py-8 text-center text-xs font-mono text-[#8E9299]">
-            No active positions. Trading engine is scanning market data feeds for qualifying strategy confluence.
+            No active positions. Trading engine is scanning market data feeds for qualifying strategy confluence (Risk Sizing: {calculateEquityLotSize(portfolio.totalEquity).toFixed(2)} Lots).
           </div>
         ) : (
           <>
@@ -1207,6 +1217,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 const openedDate = new Date(pos.openedAt || Date.now());
                 const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const lotStr = formatPositionLotSize(pos);
                 return (
                   <div
                     key={pos.id}
@@ -1225,9 +1236,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           >
                             {pos.side}
                           </span>
+                          {/* Prominent Lot Size Taken Badge */}
+                          <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-[10px]">
+                            {lotStr} Lots
+                          </span>
                         </div>
                         <div className="text-[10px] text-[#8E9299] mt-0.5">
-                          {pos.strategyName} • Size: {pos.size} (${pos.sizeUsd.toLocaleString()})
+                          {pos.strategyName} • Qty: {pos.size} (${pos.sizeUsd.toLocaleString()})
                         </div>
                       </div>
 
@@ -1249,8 +1264,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="font-semibold text-zinc-200">{dateStr}</span>
                         <span className="text-[#8E9299] text-[10px]">{timeStr}</span>
                       </div>
-                      <span className="text-[10px] text-blue-400 font-semibold">
-                        #{pos.id.replace('pos_', '').slice(-7)}
+                      <span className="text-[10px] text-amber-300 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        {lotStr} Lots
                       </span>
                     </div>
 
@@ -1295,13 +1310,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Desktop Full Data Table (hidden md:block) */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono min-w-[840px]">
+              <table className="w-full text-left text-xs font-mono min-w-[920px]">
                 <thead>
                   <tr className="border-b border-[#1F1F23] text-[#8E9299] uppercase text-[10px]">
                     <th className="py-2.5 px-3">Asset</th>
                     <th className="py-2.5 px-3">Side</th>
+                    <th className="py-2.5 px-3">Lots Taken</th>
                     <th className="py-2.5 px-3">Time / Date</th>
-                    <th className="py-2.5 px-3">Size / Value</th>
+                    <th className="py-2.5 px-3">Contract Size</th>
                     <th className="py-2.5 px-3">Entry Price</th>
                     <th className="py-2.5 px-3">Current Price</th>
                     <th className="py-2.5 px-3">Stop Loss</th>
@@ -1317,6 +1333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     const openedDate = new Date(pos.openedAt || Date.now());
                     const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                     const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const lotStr = formatPositionLotSize(pos);
                     return (
                       <tr key={pos.id} className="hover:bg-[#1F1F23]/30 transition-colors">
                         <td className="py-3 px-3 font-bold text-white">
@@ -1336,6 +1353,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             {pos.side}
                           </span>
                         </td>
+                        {/* Dedicated Lots Taken Column */}
+                        <td className="py-3 px-3">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold font-mono text-xs shadow-sm">
+                            {lotStr} Lots
+                          </span>
+                        </td>
                         <td className="py-3 px-3 whitespace-nowrap font-mono">
                           <div className="text-zinc-200 text-xs font-semibold flex items-center space-x-1">
                             <Calendar className="h-3 w-3 text-zinc-500 shrink-0" />
@@ -1347,7 +1370,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </div>
                         </td>
                         <td className="py-3 px-3 text-[#E4E4E7]">
-                          {pos.size >= 10000 ? `${(pos.size / 100000).toFixed(2)} Lots` : pos.size}{' '}
+                          <span className="font-semibold">{pos.size} units</span>{' '}
                           <span className="text-[#8E9299]">(${pos.sizeUsd.toLocaleString()})</span>
                         </td>
                         <td className="py-3 px-3 text-[#E4E4E7]">{formatPosPrice(pos.symbol, pos.entryPrice)}</td>
@@ -1422,6 +1445,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {t.side}
                         </span>
+                        <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          {formatPositionLotSize(t)} Lots
+                        </span>
+                        {t.serverName && (
+                          <span className="text-[9px] font-mono text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                            {t.serverName}
+                          </span>
+                        )}
                         <span className="text-[10px] font-mono text-[#8E9299]">[{t.exitReason}]</span>
                       </div>
                       <div className="text-[11px] font-mono text-[#8E9299] mt-0.5 truncate max-w-[240px]">

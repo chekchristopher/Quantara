@@ -43,6 +43,9 @@ export class ExecutionEngine {
     const feeRate = 0.00075;
     const feesUsd = Number((sizeUsd * feeRate).toFixed(2));
 
+    // Determine lot size strictly bounded 0.01 - 0.10 based on equity
+    const lotSize = riskValidation.calculatedLotSize || (db.portfolio.totalEquity <= 50 ? 0.01 : Math.min(0.10, Math.max(0.01, Number((0.01 + ((db.portfolio.totalEquity - 50) / 950) * 0.09).toFixed(2)))));
+
     // Create Order Record
     const order: Order = {
       id: `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -51,6 +54,7 @@ export class ExecutionEngine {
       type: 'MARKET',
       side,
       direction: isBuy ? 'BUY' : 'SELL',
+      lotSize,
       quantity,
       price: basePrice,
       status: 'FILLED',
@@ -75,12 +79,16 @@ export class ExecutionEngine {
     db.portfolio.totalTradesExecuted += 1;
     db.botState.tradesExecutedToday += 1;
 
-    // Create Position
+    // Identify active connected server for execution tracking
+    const activeServer = db.brokerAccounts.find((a) => a.id === db.botState.activeBrokerAccountId || a.isActiveForTakeover) || db.brokerAccounts[0];
+
+    // Create Position with institutional lot size taken and connected server tagging
     const position: Position = {
       id: `pos_${signal.assetSymbol.replace('/', '_')}_${Date.now()}`,
       userId: db.user.id,
       symbol: signal.assetSymbol,
       side,
+      lotSize,
       size: quantity,
       sizeUsd: Number(sizeUsd.toFixed(2)),
       entryPrice: Number(fillPrice.toFixed(basePrice > 10 ? 2 : 4)),
@@ -98,7 +106,17 @@ export class ExecutionEngine {
       openedAt: Date.now(),
       environment,
       explanationId: signal.id,
+      serverId: activeServer?.id,
+      serverName: activeServer?.name || activeServer?.server || 'Primary MT5 Server',
+      accountNumber: activeServer?.accountNumber,
+      brokerName: activeServer?.broker || 'Exness MT5',
     };
+
+    if (order) {
+      order.serverId = activeServer?.id;
+      order.serverName = activeServer?.name;
+      order.accountNumber = activeServer?.accountNumber;
+    }
 
     db.positions.push(position);
     db.portfolio.activePositionsCount = db.positions.length;
@@ -106,14 +124,14 @@ export class ExecutionEngine {
     db.addAuditLog(
       'TRADE',
       `POSITION_OPENED_${side}`,
-      `Opened ${side} ${quantity} ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} via [${signal.strategyName}] in ${environment.toUpperCase()} mode.`,
+      `Opened ${side} ${lotSize} Lots (${quantity} units) of ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} via [${signal.strategyName}] in ${environment.toUpperCase()} mode. Risk Sizing: ${lotSize} Lots.`,
       'INFO'
     );
 
     db.addNotification(
       'TRADE_OPEN',
-      `Position Opened: ${signal.assetSymbol}`,
-      `${signal.strategyName} placed ${side} for ${quantity} units at $${fillPrice.toFixed(2)}. SL: $${riskValidation.stopLossPrice}, TP: $${riskValidation.takeProfitPrice}.`,
+      `Position Opened: ${signal.assetSymbol} (${lotSize} Lots)`,
+      `${signal.strategyName} placed ${side} ${lotSize} Lots at $${fillPrice.toFixed(2)}. SL: $${riskValidation.stopLossPrice}, TP: $${riskValidation.takeProfitPrice}.`,
       'info'
     );
 
@@ -169,10 +187,14 @@ export class ExecutionEngine {
     db.portfolio.maxDrawdownPercent = Number(Math.max(db.portfolio.maxDrawdownPercent, db.portfolio.currentDrawdownPercent).toFixed(2));
     db.portfolio.todayPnlPercent = Number(((db.portfolio.realizedPnlToday / db.portfolio.totalEquity) * 100).toFixed(2));
 
+    // Resolve server identity
+    const activeAcc = db.brokerAccounts.find((a) => a.id === (pos.serverId || db.botState.activeBrokerAccountId) || a.isActiveForTakeover) || db.brokerAccounts[0];
+
     const closedItem: TradeHistoryItem = {
       id: `trd_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       symbol: pos.symbol,
       side: pos.side,
+      lotSize: pos.lotSize ?? 0.05,
       entryPrice: pos.entryPrice,
       exitPrice: currentPrice,
       quantity: pos.size,
@@ -180,11 +202,16 @@ export class ExecutionEngine {
       realizedPnlPercent: pnlPercent,
       feesPaid: fee,
       strategyName: pos.strategyName,
+      accountName: pos.serverName || activeAcc?.name || 'Institutional MT5 Server',
+      serverId: pos.serverId || activeAcc?.id || 'mt5_primary',
+      serverName: pos.serverName || activeAcc?.name || activeAcc?.server || 'Primary MT5 Server',
+      accountNumber: pos.accountNumber || activeAcc?.accountNumber || '10884920',
+      brokerName: pos.brokerName || activeAcc?.broker || 'Exness MT5',
       entryTime: pos.openedAt,
       exitTime: Date.now(),
       exitReason,
       environment,
-      tradeExplanation: `Closed ${pos.side} on ${pos.symbol} at $${currentPrice.toFixed(2)} (${exitReason}) with P&L: ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%).`,
+      tradeExplanation: `Closed ${pos.side} ${pos.lotSize ? pos.lotSize.toFixed(2) + ' Lots' : pos.size + ' Units'} on ${pos.symbol} at $${currentPrice.toFixed(2)} (${exitReason}) with P&L: ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%).`,
     };
 
     db.tradesHistory.unshift(closedItem);
@@ -192,12 +219,20 @@ export class ExecutionEngine {
     db.portfolio.activePositionsCount = db.positions.length;
 
     // Update active connected server / broker stats
-    const activeAcc = db.brokerAccounts.find((a) => a.id === db.botState.activeBrokerAccountId || a.isActiveForTakeover) || db.brokerAccounts[0];
     if (activeAcc) {
       activeAcc.simulatedBalance = Number((db.portfolio.cashBalance).toFixed(2));
       activeAcc.equity = Number((db.portfolio.totalEquity).toFixed(2));
       activeAcc.tradesCount = (activeAcc.tradesCount || 0) + 1;
       activeAcc.pnlRealized = Number(((activeAcc.pnlRealized || 0) + finalRealizedPnl).toFixed(2));
+      if (finalRealizedPnl > 0) {
+        activeAcc.winningTradesCount = (activeAcc.winningTradesCount || 0) + 1;
+      } else if (finalRealizedPnl < 0) {
+        activeAcc.losingTradesCount = (activeAcc.losingTradesCount || 0) + 1;
+      }
+      const wins = activeAcc.winningTradesCount || 0;
+      activeAcc.winRatePercent = activeAcc.tradesCount > 0 ? Number(((wins / activeAcc.tradesCount) * 100).toFixed(1)) : 0;
+      activeAcc.lotsTradedTotal = Number(((activeAcc.lotsTradedTotal || 0) + (pos.lotSize || 0.05)).toFixed(2));
+      activeAcc.peakBalance = Math.max(activeAcc.peakBalance || activeAcc.simulatedBalance, activeAcc.simulatedBalance);
       activeAcc.lastExecutionTick = Date.now();
     }
 

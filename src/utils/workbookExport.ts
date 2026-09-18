@@ -42,6 +42,10 @@ export function generateWorkbookMarkdown(): string {
         md += `> ${sec.callout.text}\n\n`;
       }
 
+      if (sec.codeOrFormula) {
+        md += `\`\`\`text\n${sec.codeOrFormula}\n\`\`\`\n\n`;
+      }
+
       if (sec.table) {
         md += `| ${sec.table.headers.join(' | ')} |\n`;
         md += `| ${sec.table.headers.map(() => '---').join(' | ')} |\n`;
@@ -119,10 +123,20 @@ export function generateWorkbookHTML(): string {
           `;
         }
 
+        let codeHTML = '';
+        if (sec.codeOrFormula) {
+          codeHTML = `
+            <div class="code-container" style="background:#0c0d12; border:1px solid #2a2a35; border-radius:8px; padding:12px; margin:16px 0; font-family:monospace; font-size:13px; color:#93c5fd; overflow-x:auto; white-space:pre;">
+              <code>${sec.codeOrFormula.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+            </div>
+          `;
+        }
+
         return `
           <div class="section">
             <h3>${sec.heading}</h3>
             ${paragraphs}
+            ${codeHTML}
             ${calloutHTML}
             ${tableHTML}
           </div>

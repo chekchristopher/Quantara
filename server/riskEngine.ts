@@ -1,8 +1,10 @@
 import { Position, RiskSettings, TradingSignal, PortfolioSummary, AuditLog } from '../src/types';
+import { calculateEquityLotSize } from '../src/utils/lotSize';
 
 export interface RiskValidationResult {
   passed: boolean;
   rejectionReason?: string;
+  calculatedLotSize: number; // Institutional MT5 lot size (strictly 0.01 - 0.10 based on equity)
   calculatedPositionSizeUsd: number;
   calculatedQuantity: number;
   stopLossPrice: number;
@@ -26,6 +28,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Emergency Kill Switch is ACTIVE (${settings.killSwitchTriggerReason || 'Manual engagement'}).`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -40,6 +43,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Maximum open positions limit reached (${openPositions.length}/${settings.maxOpenPositions}).`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -55,6 +59,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Active position already exists for ${signal.assetSymbol}.`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -70,6 +75,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Daily loss limit breached ($${Math.abs(portfolio.realizedPnlToday).toFixed(2)} / limit $${maxDailyLossAllowed.toFixed(2)}). Bot is paused for capital preservation.`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -84,6 +90,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Portfolio drawdown (${portfolio.currentDrawdownPercent.toFixed(1)}%) reached maximum threshold (${settings.maxAccountDrawdownPercent}%). New executions frozen.`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -93,7 +100,7 @@ export class RiskManagementEngine {
       };
     }
 
-    // 6. Dynamic Position Sizing (Fixed Fractional Volatility Risk Sizing)
+    // 6. Dynamic Position Sizing (Strict Institutional Lot Sizing strictly bounded 0.01 to 0.10 based on equity)
     const entry = signal.entryPrice;
     const stopLoss = signal.suggestedStopLoss;
     const takeProfit = signal.suggestedTakeProfit;
@@ -102,6 +109,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: 'Trade rejected: Invalid entry or stop loss price provided.',
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -119,6 +127,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Stop loss distance (${(stopDistancePercent * 100).toFixed(2)}%) is too tight (<0.3%) for normal spread and slippage.`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -128,21 +137,29 @@ export class RiskManagementEngine {
       };
     }
 
-    // Target risk amount in dollars (calibrated for micro-accounts and institutional scaling)
-    const isMicroAccount = portfolio.totalEquity < 250;
-    const effectiveRiskPercent = isMicroAccount ? Math.max(settings.maxRiskPerTradePercent, 2.5) : settings.maxRiskPerTradePercent;
-    let targetRiskDollar = (portfolio.totalEquity * effectiveRiskPercent) / 100;
-    
-    // For ultra-small accounts ($10 - $25), ensure minimum nominal risk floor ($0.20 - $0.50)
-    if (portfolio.totalEquity <= 50) {
-      targetRiskDollar = Math.max(0.20, targetRiskDollar);
+    // Target lot size strictly determined by equity between 0.01 and 0.10 lots
+    const targetLotSize = calculateEquityLotSize(portfolio.totalEquity);
+
+    // Map institutional lot size to asset contract units:
+    // - Gold (XAU/USD): 1 standard lot = 100 oz. 0.01 lot = 1.0 oz.
+    // - Major Forex (EUR/USD, GBP/USD, USD/JPY): 1 standard lot = 100,000 units. 0.01 lot = 1,000 units.
+    // - Crypto (BTC/USD): 1 lot = 1 BTC. 0.01 lot = 0.01 BTC.
+    let calculatedQuantity = 0;
+    const sym = signal.assetSymbol.toUpperCase();
+    if (sym.includes('XAU') || sym.includes('GOLD')) {
+      calculatedQuantity = Number((targetLotSize * 100).toFixed(2));
+    } else if (sym.includes('BTC')) {
+      calculatedQuantity = Number(targetLotSize.toFixed(4));
+    } else if (sym.includes('EUR') || sym.includes('GBP') || sym.includes('JPY') || sym.includes('AUD') || sym.includes('CAD')) {
+      calculatedQuantity = Number((targetLotSize * 100000).toFixed(0));
+    } else {
+      calculatedQuantity = entry > 1000 ? Number(targetLotSize.toFixed(4)) : entry > 20 ? Number((targetLotSize * 100).toFixed(2)) : Number((targetLotSize * 100000).toFixed(0));
     }
-    
-    // Position quantity = Risk Amount / Stop Loss Distance Per Unit
-    let calculatedQuantity = targetRiskDollar / stopDistance;
+
     let calculatedSizeUsd = calculatedQuantity * entry;
 
     // 7. Max Single Asset Exposure Constraint (scaled for micro accounts)
+    const isMicroAccount = portfolio.totalEquity < 250;
     const maxExposurePercent = isMicroAccount ? 75.0 : settings.maxExposurePerAssetPercent;
     const maxAssetExposureUsd = (portfolio.totalEquity * maxExposurePercent) / 100;
     if (calculatedSizeUsd > maxAssetExposureUsd) {
@@ -162,6 +179,7 @@ export class RiskManagementEngine {
         return {
           passed: false,
           rejectionReason: `Trade rejected: Total portfolio exposure ceiling ($${maxTotalExposureAllowed.toFixed(2)}) reached.`,
+          calculatedLotSize: 0,
           calculatedPositionSizeUsd: 0,
           calculatedQuantity: 0,
           stopLossPrice: 0,
@@ -185,6 +203,7 @@ export class RiskManagementEngine {
       return {
         passed: false,
         rejectionReason: `Trade rejected: Calculated position size ($${calculatedSizeUsd.toFixed(2)}) is below execution minimum ($0.50).`,
+        calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
         stopLossPrice: 0,
@@ -199,6 +218,7 @@ export class RiskManagementEngine {
 
     return {
       passed: true,
+      calculatedLotSize: targetLotSize,
       calculatedPositionSizeUsd: Number(calculatedSizeUsd.toFixed(2)),
       calculatedQuantity: Number(calculatedQuantity.toFixed(entry > 1000 ? 6 : entry > 100 ? 4 : 2)),
       stopLossPrice: Number(stopLoss.toFixed(entry > 10 ? 2 : 4)),

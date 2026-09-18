@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { formatPositionLotSize } from '../utils/lotSize';
 
 interface TradeExplanationModalProps {
   tradeOrSignalId: string | null;
@@ -83,11 +84,17 @@ export const TradeExplanationModal: React.FC<TradeExplanationModalProps> = ({
         </div>
 
         {/* Trade Coordinates Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-lg bg-[#0E0E11] p-3 border border-[#1F1F23] text-xs font-mono">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded-lg bg-[#0E0E11] p-3 border border-[#1F1F23] text-xs font-mono">
           <div>
             <span className="text-[#8E9299] block text-[10px] font-sans">Asset & Side</span>
             <span className="font-semibold text-white">
               {symbol} <span className="text-[#10B981]">({side})</span>
+            </span>
+          </div>
+          <div>
+            <span className="text-[#8E9299] block text-[10px] font-sans">Lot Size Taken</span>
+            <span className="font-bold text-amber-300">
+              {formatPositionLotSize(customData || {})} Lots
             </span>
           </div>
           <div>

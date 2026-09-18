@@ -43,8 +43,11 @@ import {
   Unlock,
   Wifi,
   Zap,
+  FileText,
 } from 'lucide-react';
-import { BrokerAccount, MarketAsset, Order, PortfolioSummary, Position } from '../types';
+import { BrokerAccount, MarketAsset, Order, PortfolioSummary, Position, TradeHistoryItem } from '../types';
+import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
+import { AccountReportView } from './AccountReportView';
 
 interface AccountBrokerViewProps {
   brokerAccounts: BrokerAccount[];
@@ -54,6 +57,9 @@ interface AccountBrokerViewProps {
   orders?: Order[];
   portfolio?: PortfolioSummary;
   assets?: MarketAsset[];
+  tradesHistory?: TradeHistoryItem[];
+  user?: any;
+  onRefreshData?: () => void;
   onLoginMT5?: (payload: any) => Promise<any>;
   onUpdateMT5Control?: (payload: any) => Promise<any>;
   onCloseAllMT5?: () => Promise<any>;
@@ -295,8 +301,11 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   onStopServer,
   onPauseAllServers,
   onRunAllServers,
+  tradesHistory = [],
+  user,
+  onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal'>(
+  const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal' | 'report'>(
     brokerAccounts.length === 0 ? 'login' : 'control'
   );
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -618,6 +627,17 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           >
             <Server className="h-3.5 w-3.5" />
             <span>Accounts ({brokerAccounts.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+              activeTab === 'report'
+                ? 'bg-blue-600 text-white shadow-sm font-bold'
+                : 'text-[#8E9299] hover:text-white'
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Server Report</span>
           </button>
           <button
             onClick={() => setActiveTab('journal')}
@@ -1176,9 +1196,9 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
 
                           <div className="grid grid-cols-2 gap-2 text-[11px] py-1 border-y border-[#1F1F23]/60">
                             <div>
-                              <span className="text-[#8E9299] block text-[10px]">Volume:</span>
-                              <span className="text-zinc-200 font-semibold">
-                                {pos.size >= 100 ? `${(pos.size / 100).toFixed(2)} Lots` : `${pos.size} Units`}
+                              <span className="text-[#8E9299] block text-[10px]">Lot Size Taken:</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs">
+                                {formatPositionLotSize(pos)} Lots
                               </span>
                             </div>
                             <div>
@@ -1225,7 +1245,8 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                           <th className="pb-2">Time / Date</th>
                           <th className="pb-2">Symbol</th>
                           <th className="pb-2">Type</th>
-                          <th className="pb-2">Volume</th>
+                          <th className="pb-2">Lots Taken</th>
+                          <th className="pb-2">Contract Qty</th>
                           <th className="pb-2">Open Price</th>
                           <th className="pb-2">Current</th>
                           <th className="pb-2">Stop Loss</th>
@@ -1241,6 +1262,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                           const openedDate = new Date(pos.openedAt || Date.now());
                           const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                           const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                          const lotStr = formatPositionLotSize(pos);
                           return (
                             <tr key={pos.id} className="hover:bg-[#1A1A1E] transition-colors">
                               <td className="py-2.5 font-mono text-blue-400 font-semibold">#{ticketNum}</td>
@@ -1271,8 +1293,13 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                                   {pos.side === 'LONG' ? 'BUY' : 'SELL'}
                                 </span>
                               </td>
-                              <td className="py-2.5 font-semibold text-zinc-200">
-                                {pos.size >= 100 ? `${(pos.size / 100).toFixed(2)} Lots` : `${pos.size} Units`}
+                              <td className="py-2.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs">
+                                  {lotStr} Lots
+                                </span>
+                              </td>
+                              <td className="py-2.5 font-semibold text-zinc-300">
+                                {pos.size} units
                               </td>
                               <td className="py-2.5 text-zinc-300">
                                 ${pos.entryPrice.toFixed(pos.entryPrice > 100 ? 2 : 4)}
@@ -2330,6 +2357,18 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                         )}
                         <button
                           type="button"
+                          onClick={() => {
+                            if (onSelectActiveBroker) onSelectActiveBroker(acc.id);
+                            setActiveTab('report');
+                          }}
+                          className="rounded bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 px-2 py-1 text-xs font-mono flex items-center space-x-1 border border-emerald-500/30 transition-colors"
+                          title="View complete account performance report"
+                        >
+                          <FileText className="h-3 w-3 text-emerald-400" />
+                          <span>View Report</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleStartRename(acc)}
                           className="rounded bg-[#0E0E11] hover:bg-zinc-800 text-zinc-300 hover:text-white px-2 py-1 text-xs font-mono flex items-center space-x-1 border border-[#1F1F23] hover:border-zinc-700 transition-colors"
                           title="Rename account"
@@ -2453,6 +2492,22 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
             </p>
           </div>
         </div>
+      )}
+
+      {/* TAB 5: Connected Server Institutional Account Report */}
+      {activeTab === 'report' && (
+        <AccountReportView
+          brokerAccounts={brokerAccounts}
+          selectedServerId={activeAccount?.id}
+          onSelectServer={(id) => {
+            if (onSelectActiveBroker) {
+              onSelectActiveBroker(id);
+            }
+          }}
+          tradesHistory={tradesHistory}
+          user={user}
+          onRefresh={onRefreshData}
+        />
       )}
     </div>
   );
