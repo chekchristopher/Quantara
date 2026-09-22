@@ -402,4 +402,17 @@ export const api = {
     const res = await fetch('/api/reports/enterprise');
     return res.json();
   },
+
+  // Trade Journal Review & Psychological Notes
+  async updateTradeJournalReview(
+    tradeId: string,
+    review: Partial<TradeHistoryItem>
+  ): Promise<{ success: boolean; trade: TradeHistoryItem }> {
+    const res = await fetch(`/api/trades/${tradeId}/journal`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(review),
+    });
+    return res.json();
+  },
 };

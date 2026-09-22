@@ -9,6 +9,7 @@ import {
   OfflineSessionStats,
   OfflineTradeRecord,
   Order,
+  PortfolioRealizedPnlPoint,
   PortfolioSummary,
   Position,
   RiskSettings,
@@ -106,6 +107,58 @@ export class AppDatabase {
   constructor() {
     this.initializePersistedAccounts();
     this.initializeEngineState();
+    this.rebuildRealizedPnlTodayHistory();
+  }
+
+  public rebuildRealizedPnlTodayHistory(): void {
+    if (this.portfolio.realizedPnlTodayHistory && this.portfolio.realizedPnlTodayHistory.length > 1) {
+      return;
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const startTimestamp = todayStart.getTime();
+
+    // Find closed trades from today or recent session
+    const recentTrades = [...this.tradesHistory]
+      .filter((t) => t.exitTime && t.exitTime >= startTimestamp - 24 * 3600 * 1000)
+      .sort((a, b) => (a.exitTime || 0) - (b.exitTime || 0));
+
+    const points: PortfolioRealizedPnlPoint[] = [];
+
+    // Session opening baseline
+    const firstTradeTime = recentTrades.length > 0 ? (recentTrades[0].exitTime || Date.now()) - 30 * 60 * 1000 : Date.now() - 4 * 3600 * 1000;
+    points.push({
+      time: new Date(firstTradeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: firstTradeTime,
+      realizedPnlToday: 0.0,
+      delta: 0,
+      symbol: 'Session Open',
+    });
+
+    let runningPnl = 0;
+    for (const trade of recentTrades) {
+      runningPnl = Number((runningPnl + trade.realizedPnl).toFixed(2));
+      points.push({
+        time: new Date(trade.exitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: trade.exitTime,
+        realizedPnlToday: runningPnl,
+        delta: trade.realizedPnl,
+        symbol: trade.symbol,
+        exitReason: trade.exitReason,
+      });
+    }
+
+    // Current checkpoint
+    const now = Date.now();
+    points.push({
+      time: new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: now,
+      realizedPnlToday: this.portfolio.realizedPnlToday,
+      delta: 0,
+    });
+
+    this.portfolio.realizedPnlTodayHistory = points;
   }
 
   private loadPersistedAccounts(): BrokerAccount[] {

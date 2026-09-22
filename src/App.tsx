@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, Database, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
+import { Activity, Brain, Database, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkbookView } from './components/WorkbookView';
@@ -8,6 +8,7 @@ import { BacktestingView } from './components/BacktestingView';
 import { StrategyLibraryView } from './components/StrategyLibraryView';
 import { RiskManagementView } from './components/RiskManagementView';
 import { AccountBrokerView } from './components/AccountBrokerView';
+import { TradeJournalView } from './components/TradeJournalView';
 import { MicroAccountCompoundingView } from './components/MicroAccountCompoundingView';
 import { SystemTestingView } from './components/SystemTestingView';
 import { AdminDashboardView } from './components/AdminDashboardView';
@@ -712,6 +713,19 @@ function QuantaraApp() {
             onStopServer={handleStopBrokerServer}
             onPauseAllServers={handlePauseAllServers}
             onRunAllServers={handleRunAllServers}
+            onNavigateTab={setCurrentTab}
+          />
+        )}
+
+        {currentTab === 'journal' && (
+          <TradeJournalView
+            tradesHistory={tradesHistory}
+            onNavigateTab={setCurrentTab}
+            onTradeReviewed={(updatedTrade) => {
+              setTradesHistory((prev) =>
+                prev.map((t) => (t.id === updatedTrade.id ? updatedTrade : t))
+              );
+            }}
           />
         )}
 
@@ -831,6 +845,17 @@ function QuantaraApp() {
             )}
           </div>
           <span className="truncate">MT5 / Brokers</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('journal')}
+          className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+            currentTab === 'journal' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+          }`}
+        >
+          <Brain className="h-4 w-4 mb-0.5" />
+          <span className="truncate">Journal</span>
         </button>
 
         <button

@@ -56,6 +56,7 @@ import {
 } from '../types';
 import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
 import { OrderBookDepthVisualizer } from './OrderBookDepthVisualizer';
+import { SessionPnlChart } from './SessionPnlChart';
 import { useTheme } from '../context/ThemeContext';
 
 interface DashboardViewProps {
@@ -562,9 +563,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Today's P&L */}
-        <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4 shadow-sm">
+        <div
+          onClick={() => {
+            const el = document.getElementById('session-pnl-trend-container');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="rounded-xl border border-[#1F1F23] bg-[#141416] p-3 sm:p-4 shadow-sm hover:border-blue-500/40 cursor-pointer transition-colors group"
+          title="Click to focus Session Realized P&L Trend Chart"
+        >
           <div className="flex items-center justify-between text-[#8E9299]">
-            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-semibold">Today's P&L</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-semibold">Today's P&amp;L</span>
+              <span className="text-[9px] text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity font-mono">
+                Trend ↓
+              </span>
+            </div>
             {portfolio.realizedPnlToday >= 0 ? (
               <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#10B981]" />
             ) : (
@@ -578,7 +591,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             {portfolio.realizedPnlToday >= 0 ? '+' : ''}${portfolio.realizedPnlToday.toFixed(2)}
           </div>
-          <div className="mt-1 flex items-center text-[10px] sm:text-xs font-mono text-[#8E9299]">
+          <div className="mt-1 flex items-center justify-between text-[10px] sm:text-xs font-mono text-[#8E9299]">
             <span className={portfolio.todayPnlPercent >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}>
               {portfolio.todayPnlPercent >= 0 ? '+' : ''}{portfolio.todayPnlPercent}%
             </span>
@@ -646,6 +659,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 1.5 SESSION REALIZED P&L (realizedPnlToday) PERFORMANCE LINE CHART */}
+      <SessionPnlChart
+        portfolio={portfolio}
+        tradesHistory={tradesHistory}
+        riskSettings={riskSettings}
+        onNavigateTab={onNavigateTab}
+      />
 
       {/* 2. MAIN TERMINAL GRID: CHART + BOT CONTROLLER & QUICK TICKET */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
@@ -1431,9 +1452,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Closed Trades History */}
         <div className="rounded-xl border border-[#1F1F23] bg-[#141416] p-5 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#1F1F23]">
-            <span className="text-xs font-semibold uppercase tracking-wider text-white">
-              Recent Closed Trades ({tradesHistory.length})
-            </span>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-white">
+                Recent Closed Trades ({tradesHistory.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('journal')}
+                className="text-[10px] text-blue-400 hover:text-blue-300 font-medium px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-colors"
+              >
+                Trade Journal &amp; Notes ➔
+              </button>
+            </div>
             <span className="font-mono text-xs text-[#10B981] font-semibold">
               Net Realized: ${portfolio.totalRealizedPnl.toFixed(2)}
             </span>
@@ -1464,6 +1494,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
                           {formatPositionLotSize(t)} Lots
                         </span>
+                        {t.disciplineRating ? (
+                          <span className="text-[9px] font-mono text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                            ★ {t.disciplineRating}/5
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
+                            Unreviewed
+                          </span>
+                        )}
                         {t.serverName && (
                           <span className="text-[9px] font-mono text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
                             {t.serverName}

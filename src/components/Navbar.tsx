@@ -4,6 +4,7 @@ import {
   AlertOctagon,
   Bell,
   BookOpen,
+  Brain,
   CheckCircle,
   ChevronRight,
   Cpu,
@@ -126,6 +127,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       desc: 'Connected servers, automated trade reports & encrypted Firebase sync',
       category: 'Core Terminal',
       icon: Database,
+    },
+    {
+      id: 'journal',
+      label: 'Trade Journal',
+      desc: 'Automated performance logs, subjective strategy notes & psychological discipline audit',
+      category: 'Core Terminal',
+      icon: Brain,
     },
     {
       id: 'compounding',

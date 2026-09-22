@@ -14,7 +14,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { BrokerAccount, RiskSettings, TradeHistoryItem, AuditLog, ServerAccountReport } from '../types';
+import { BrokerAccount, RiskSettings, TradeHistoryItem, AuditLog, ServerAccountReport, TradeJournalEntry } from '../types';
 
 export interface UserProfileDoc {
   id: string;
@@ -525,7 +525,7 @@ export const firestoreSync = {
   async logJournalTrade(userId: string, trade: TradeHistoryItem): Promise<void> {
     const path = `users/${userId}/journal/${trade.id}`;
     const docRef = doc(db, 'users', userId, 'journal', trade.id);
-    const payload = {
+    const payload: Record<string, any> = {
       id: trade.id,
       userId,
       symbol: trade.symbol,
@@ -537,14 +537,95 @@ export const firestoreSync = {
       realizedPnlPercent: trade.realizedPnlPercent,
       strategyName: trade.strategyName || 'Adaptive Regime Meta-Engine',
       status: 'CLOSED',
-      notes: trade.tradeExplanation || `Closed with ${trade.realizedPnl >= 0 ? 'profit' : 'loss'} of $${trade.realizedPnl.toFixed(2)}`,
+      notes: trade.subjectiveNotes || trade.notes || trade.tradeExplanation || `Closed with ${trade.realizedPnl >= 0 ? 'profit' : 'loss'} of $${trade.realizedPnl.toFixed(2)}`,
       openedAt: new Date(trade.entryTime).toISOString(),
       closedAt: new Date(trade.exitTime).toISOString(),
+      ...(trade.disciplineRating !== undefined ? { disciplineRating: trade.disciplineRating } : {}),
+      ...(trade.emotionalState ? { emotionalState: trade.emotionalState } : {}),
+      ...(trade.followedPlan ? { followedPlan: trade.followedPlan } : {}),
+      ...(trade.mistakeTags && trade.mistakeTags.length > 0 ? { mistakeTags: trade.mistakeTags } : {}),
+      ...(trade.subjectiveNotes ? { subjectiveNotes: trade.subjectiveNotes } : {}),
+      ...(trade.lessonsLearned ? { lessonsLearned: trade.lessonsLearned } : {}),
+      ...(trade.targetSetupQuality ? { targetSetupQuality: trade.targetSetupQuality } : {}),
+      ...(trade.psychologyReviewCompleted !== undefined ? { psychologyReviewCompleted: trade.psychologyReviewCompleted } : {}),
+      ...(trade.reviewedAt ? { reviewedAt: new Date(trade.reviewedAt).toISOString() } : {}),
     };
     try {
       await setDoc(docRef, payload, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // Save or update subjective psychological review for a specific closed trade
+  async saveTradeJournalReview(
+    userId: string,
+    tradeId: string,
+    review: {
+      disciplineRating?: number;
+      emotionalState?: string;
+      followedPlan?: string;
+      mistakeTags?: string[];
+      subjectiveNotes?: string;
+      lessonsLearned?: string;
+      targetSetupQuality?: string;
+      notes?: string;
+    }
+  ): Promise<void> {
+    const path = `users/${userId}/journal/${tradeId}`;
+    const docRef = doc(db, 'users', userId, 'journal', tradeId);
+    const payload: Record<string, any> = {
+      psychologyReviewCompleted: true,
+      reviewedAt: new Date().toISOString(),
+    };
+    if (review.disciplineRating !== undefined) payload.disciplineRating = review.disciplineRating;
+    if (review.emotionalState !== undefined) payload.emotionalState = review.emotionalState;
+    if (review.followedPlan !== undefined) payload.followedPlan = review.followedPlan;
+    if (review.mistakeTags !== undefined) payload.mistakeTags = review.mistakeTags;
+    if (review.subjectiveNotes !== undefined) {
+      payload.subjectiveNotes = review.subjectiveNotes;
+      payload.notes = review.subjectiveNotes;
+    }
+    if (review.lessonsLearned !== undefined) payload.lessonsLearned = review.lessonsLearned;
+    if (review.targetSetupQuality !== undefined) payload.targetSetupQuality = review.targetSetupQuality;
+    if (review.notes !== undefined && !payload.notes) payload.notes = review.notes;
+
+    try {
+      await setDoc(docRef, payload, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // Subscribe to real-time updates of the user's trading journal from Firestore
+  subscribeJournalTrades(
+    userId: string,
+    callback: (entries: TradeJournalEntry[]) => void
+  ): Unsubscribe {
+    const colRef = collection(db, 'users', userId, 'journal');
+    const q = query(colRef, limit(200));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const entries = snapshot.docs.map((docSnap) => docSnap.data() as TradeJournalEntry);
+        callback(entries);
+      },
+      (error) => {
+        console.warn('Notice: Firestore journal sync fallback:', error.message);
+      }
+    );
+  },
+
+  // Fetch all journal trades once from Firestore
+  async getJournalTrades(userId: string): Promise<TradeJournalEntry[]> {
+    const path = `users/${userId}/journal`;
+    try {
+      const colRef = collection(db, 'users', userId, 'journal');
+      const snapshot = await getDocs(colRef);
+      return snapshot.docs.map((d) => d.data() as TradeJournalEntry);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
     }
   },
 

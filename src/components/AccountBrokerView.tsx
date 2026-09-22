@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  Brain,
   Calendar,
   Check,
   CheckCircle,
@@ -76,6 +77,7 @@ interface AccountBrokerViewProps {
   onStopServer?: (id: string) => Promise<any>;
   onPauseAllServers?: () => Promise<any>;
   onRunAllServers?: () => Promise<any>;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const RANDOM_ACCOUNT_NAMES = [
@@ -305,6 +307,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   tradesHistory = [],
   user,
   onRefreshData,
+  onNavigateTab,
 }) => {
   const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal' | 'report' | 'bridge'>(
     brokerAccounts.length === 0 ? 'login' : 'control'
@@ -662,8 +665,18 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
             }`}
           >
             <Terminal className="h-3.5 w-3.5" />
-            <span>MT5 Journal</span>
+            <span>MT5 Stream</span>
           </button>
+          {onNavigateTab && (
+            <button
+              onClick={() => onNavigateTab('journal')}
+              className="px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 text-blue-400 hover:text-white bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40"
+              title="Open the Trade Journal with psychological discipline auditing & notes"
+            >
+              <Brain className="h-3.5 w-3.5" />
+              <span>Trade Journal &amp; Notes ➔</span>
+            </button>
+          )}
         </div>
       </div>
 

@@ -186,7 +186,16 @@ service cloud.firestore {
         (!('realizedPnlPercent' in data) || data.realizedPnlPercent is number) &&
         (!('strategyName' in data) || (data.strategyName is string && data.strategyName.size() <= 128)) &&
         (!('marketRegime' in data) || (data.marketRegime is string && data.marketRegime.size() <= 64)) &&
-        (!('notes' in data) || (data.notes is string && data.notes.size() <= 1024)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 4096)) &&
+        (!('disciplineRating' in data) || (data.disciplineRating is number && data.disciplineRating >= 1 && data.disciplineRating <= 5)) &&
+        (!('emotionalState' in data) || (data.emotionalState is string && data.emotionalState.size() <= 64)) &&
+        (!('followedPlan' in data) || (data.followedPlan is string && data.followedPlan.size() <= 64)) &&
+        (!('mistakeTags' in data) || data.mistakeTags is list) &&
+        (!('subjectiveNotes' in data) || (data.subjectiveNotes is string && data.subjectiveNotes.size() <= 4096)) &&
+        (!('lessonsLearned' in data) || (data.lessonsLearned is string && data.lessonsLearned.size() <= 2048)) &&
+        (!('targetSetupQuality' in data) || (data.targetSetupQuality is string && data.targetSetupQuality.size() <= 16)) &&
+        (!('psychologyReviewCompleted' in data) || data.psychologyReviewCompleted is bool) &&
+        (!('reviewedAt' in data) || (data.reviewedAt is string && data.reviewedAt.size() <= 64) || data.reviewedAt is number) &&
         data.openedAt is string && data.openedAt.size() <= 64 &&
         (!('closedAt' in data) || (data.closedAt is string && data.closedAt.size() <= 64));
     }
@@ -207,7 +216,8 @@ service cloud.firestore {
 
     // Diagnostics & Connection Probe
     match /test/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // User Profile Document

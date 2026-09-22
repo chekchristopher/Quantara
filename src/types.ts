@@ -231,6 +231,20 @@ export interface Order {
   ticketNumber?: number;
 }
 
+export type DisciplineRating = 1 | 2 | 3 | 4 | 5;
+
+export type EmotionalState =
+  | 'CALM_FOCUSED'
+  | 'DISCIPLINED'
+  | 'PATIENT'
+  | 'FOMO_IMPATIENT'
+  | 'ANXIOUS_HESITANT'
+  | 'OVERCONFIDENT'
+  | 'REVENGE_BIAS'
+  | 'FATIGUED';
+
+export type PlanAdherence = 'STRICT_YES' | 'MINOR_DEVIATION' | 'BREACHED_RULES';
+
 export interface TradeHistoryItem {
   id: string;
   symbol: string;
@@ -255,6 +269,55 @@ export interface TradeHistoryItem {
   tradeExplanation: string;
   realExecution?: boolean;
   ticketNumber?: number;
+
+  // Psychological discipline & subjective strategy review
+  disciplineRating?: DisciplineRating;
+  emotionalState?: EmotionalState;
+  followedPlan?: PlanAdherence;
+  mistakeTags?: string[];
+  subjectiveNotes?: string;
+  lessonsLearned?: string;
+  targetSetupQuality?: 'A+' | 'A' | 'B' | 'C' | 'D';
+  psychologyReviewCompleted?: boolean;
+  reviewedAt?: number;
+  notes?: string;
+}
+
+export interface TradeJournalEntry {
+  id: string;
+  tradeId: string;
+  userId?: string;
+  symbol: string;
+  direction: PositionSide;
+  entryPrice: number;
+  exitPrice?: number;
+  quantity: number;
+  realizedPnl: number;
+  realizedPnlPercent: number;
+  strategyName: string;
+  status: 'CLOSED' | 'OPEN';
+  openedAt: string;
+  closedAt?: string;
+
+  disciplineRating?: DisciplineRating;
+  emotionalState?: EmotionalState;
+  followedPlan?: PlanAdherence;
+  mistakeTags?: string[];
+  subjectiveNotes?: string;
+  lessonsLearned?: string;
+  targetSetupQuality?: 'A+' | 'A' | 'B' | 'C' | 'D';
+  psychologyReviewCompleted?: boolean;
+  reviewedAt?: string | number;
+  notes?: string;
+}
+
+export interface PortfolioRealizedPnlPoint {
+  time: string;
+  timestamp: number;
+  realizedPnlToday: number;
+  delta?: number;
+  symbol?: string;
+  exitReason?: string;
 }
 
 export interface PortfolioSummary {
@@ -274,6 +337,7 @@ export interface PortfolioSummary {
   currentExposureUsd: number;
   currentExposurePercent: number;
   peakEquity: number;
+  realizedPnlTodayHistory?: PortfolioRealizedPnlPoint[];
 }
 
 export interface BotState {

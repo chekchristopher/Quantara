@@ -156,6 +156,15 @@ app.post('/api/portfolio/reset-capital', (req, res) => {
   db.portfolio.unrealizedPnl = 0;
   db.portfolio.realizedPnlToday = 0;
   db.portfolio.totalRealizedPnl = 0;
+  db.portfolio.realizedPnlTodayHistory = [
+    {
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: Date.now(),
+      realizedPnlToday: 0,
+      delta: 0,
+      symbol: 'Session Reset',
+    },
+  ];
   db.portfolio.currentExposureUsd = 0;
   db.portfolio.currentExposurePercent = 0;
   db.portfolio.currentDrawdownPercent = 0;
@@ -340,6 +349,45 @@ app.get('/api/orders', (req, res) => {
 
 app.get('/api/trades/history', (req, res) => {
   res.json(db.tradesHistory);
+});
+
+app.patch('/api/trades/:id/journal', (req, res) => {
+  const { id } = req.params;
+  const {
+    disciplineRating,
+    emotionalState,
+    followedPlan,
+    mistakeTags,
+    subjectiveNotes,
+    lessonsLearned,
+    targetSetupQuality,
+    notes,
+  } = req.body;
+
+  const trade = db.tradesHistory.find((t) => t.id === id);
+  if (!trade) {
+    return res.status(404).json({ success: false, message: 'Trade not found in history' });
+  }
+
+  if (disciplineRating !== undefined) trade.disciplineRating = disciplineRating;
+  if (emotionalState !== undefined) trade.emotionalState = emotionalState;
+  if (followedPlan !== undefined) trade.followedPlan = followedPlan;
+  if (mistakeTags !== undefined && Array.isArray(mistakeTags)) trade.mistakeTags = mistakeTags;
+  if (subjectiveNotes !== undefined) trade.subjectiveNotes = subjectiveNotes;
+  if (lessonsLearned !== undefined) trade.lessonsLearned = lessonsLearned;
+  if (targetSetupQuality !== undefined) trade.targetSetupQuality = targetSetupQuality;
+  if (notes !== undefined) trade.notes = notes;
+  trade.psychologyReviewCompleted = true;
+  trade.reviewedAt = Date.now();
+
+  db.persistEngineState();
+  db.addAuditLog(
+    'TRADE',
+    'TRADE_JOURNAL_REVIEWED',
+    `Appended subjective psychological review to trade ${trade.symbol} (${trade.id}): Discipline Rating ${trade.disciplineRating || 'N/A'}/5, State: ${trade.emotionalState || 'Not Specified'}.`
+  );
+
+  res.json({ success: true, trade });
 });
 
 app.post('/api/orders/manual', (req, res) => {

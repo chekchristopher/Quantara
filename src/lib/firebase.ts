@@ -13,7 +13,7 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   getDoc,
   getDocFromServer,
@@ -33,8 +33,14 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Initialize Firestore with the dedicated database ID from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// CRITICAL: Initialize Firestore with experimentalForceLongPolling to avoid 10-second WebChannel streaming timeouts in proxy/iframe environments
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalForceLongPolling: true,
+  },
+  firebaseConfig.firestoreDatabaseId
+);
 
 // Initialize Firebase Authentication
 export const auth = getAuth(app);
@@ -93,20 +99,23 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Connection Probe to ensure Firebase Firestore connection is validated
-export async function validateFirestoreConnection(): Promise<boolean> {
+// Validate Connection to Firestore with quick timeout to avoid 10-second WebChannel timeout warnings
+export async function testConnection(): Promise<boolean> {
   try {
-    // Only attempt probe if user is signed in or probe test doc
-    if (auth.currentUser) {
-      await getDocFromServer(doc(db, 'test', 'connection'));
-    }
+    const probePromise = getDocFromServer(doc(db, 'test', 'connection'));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('connection probe timeout (offline fallback)')), 3000)
+    );
+    await Promise.race([probePromise, timeoutPromise]);
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firestore client is offline. Checking network/Firebase configuration.');
-      return false;
-    }
-    // Non-fatal if test doc does not exist or permission denied when unauthenticated
-    return true;
+    // Non-fatal if offline or probe timed out, client seamlessly uses offline cache
+    return false;
   }
 }
+
+// Initial boot probe (non-blocking)
+testConnection().catch(() => {});
+
+// Backward compatibility alias for AuthContext and other consumers
+export const validateFirestoreConnection = testConnection;

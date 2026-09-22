@@ -215,6 +215,20 @@ export class ExecutionEngine {
     db.portfolio.maxDrawdownPercent = Number(Math.max(db.portfolio.maxDrawdownPercent, db.portfolio.currentDrawdownPercent).toFixed(2));
     db.portfolio.todayPnlPercent = Number(((db.portfolio.realizedPnlToday / db.portfolio.totalEquity) * 100).toFixed(2));
 
+    // Update realizedPnlTodayHistory trend
+    if (!db.portfolio.realizedPnlTodayHistory) {
+      db.portfolio.realizedPnlTodayHistory = [];
+    }
+    const closeTimestamp = Date.now();
+    db.portfolio.realizedPnlTodayHistory.push({
+      time: new Date(closeTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: closeTimestamp,
+      realizedPnlToday: db.portfolio.realizedPnlToday,
+      delta: finalRealizedPnl,
+      symbol: pos.symbol,
+      exitReason,
+    });
+
     // Resolve server identity
     const activeAcc = db.brokerAccounts.find((a) => a.id === (pos.serverId || db.botState.activeBrokerAccountId) || a.isActiveForTakeover) || db.brokerAccounts[0];
 
