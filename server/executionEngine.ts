@@ -1,6 +1,7 @@
 import { db } from './db';
 import { EnvironmentMode, Order, Position, TradeHistoryItem, TradingSignal } from '../src/types';
 import { RiskValidationResult } from './riskEngine';
+import { realBrokerBridge } from './realBrokerBridge';
 
 export class ExecutionEngine {
   private processedIdempotencyKeys: Set<string> = new Set();
@@ -82,6 +83,9 @@ export class ExecutionEngine {
     // Identify active connected server for execution tracking
     const activeServer = db.brokerAccounts.find((a) => a.id === db.botState.activeBrokerAccountId || a.isActiveForTakeover) || db.brokerAccounts[0];
 
+    // Determine if Real Broker Order Placement is active
+    const isRealBrokerActive = realBrokerBridge.isRealBrokerExecutionEnabled || db.botState.realExecutionMode === 'REAL_BROKER' || environment === 'live';
+
     // Create Position with institutional lot size taken and connected server tagging
     const position: Position = {
       id: `pos_${signal.assetSymbol.replace('/', '_')}_${Date.now()}`,
@@ -110,21 +114,45 @@ export class ExecutionEngine {
       serverName: activeServer?.name || activeServer?.server || 'Primary MT5 Server',
       accountNumber: activeServer?.accountNumber,
       brokerName: activeServer?.broker || 'Exness MT5',
+      realExecution: isRealBrokerActive,
+      brokerExecutionStatus: isRealBrokerActive ? 'PENDING_TERMINAL' : 'SIMULATED',
     };
 
     if (order) {
       order.serverId = activeServer?.id;
       order.serverName = activeServer?.name;
       order.accountNumber = activeServer?.accountNumber;
+      order.realExecution = isRealBrokerActive;
     }
 
     db.positions.push(position);
     db.portfolio.activePositionsCount = db.positions.length;
 
+    // Dispatches directly to real broker execution pipeline (MQL5 EA Bridge + MetaAPI Cloud + Webhook)
+    if (isRealBrokerActive) {
+      realBrokerBridge.dispatchRealOrder({
+        orderId: order.id,
+        positionId: position.id,
+        action: signal.direction,
+        symbol: signal.assetSymbol,
+        lotSize,
+        price: fillPrice,
+        stopLoss: riskValidation.stopLossPrice,
+        takeProfit: riskValidation.takeProfitPrice,
+        serverId: activeServer?.id,
+        accountNumber: activeServer?.accountNumber,
+        comment: `Quantara [${signal.strategyName}]`,
+      }).catch((err) => {
+        console.warn('Real broker order dispatch notice:', err);
+      });
+    }
+
     db.addAuditLog(
       'TRADE',
-      `POSITION_OPENED_${side}`,
-      `Opened ${side} ${lotSize} Lots (${quantity} units) of ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} via [${signal.strategyName}] in ${environment.toUpperCase()} mode. Risk Sizing: ${lotSize} Lots.`,
+      isRealBrokerActive ? 'REAL_BROKER_ORDER_DISPATCHED' : `POSITION_OPENED_${side}`,
+      isRealBrokerActive
+        ? `⚡ REAL BROKER ORDER DISPATCHED: ${side} ${lotSize} Lots on ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} sent to Live MT5 Terminal (Account #${activeServer?.accountNumber || 'Primary'}).`
+        : `Opened ${side} ${lotSize} Lots (${quantity} units) of ${signal.assetSymbol} @ $${fillPrice.toFixed(2)} via [${signal.strategyName}] in ${environment.toUpperCase()} mode. Risk Sizing: ${lotSize} Lots.`,
       'INFO'
     );
 
@@ -190,6 +218,8 @@ export class ExecutionEngine {
     // Resolve server identity
     const activeAcc = db.brokerAccounts.find((a) => a.id === (pos.serverId || db.botState.activeBrokerAccountId) || a.isActiveForTakeover) || db.brokerAccounts[0];
 
+    const isRealBrokerActive = pos.realExecution || realBrokerBridge.isRealBrokerExecutionEnabled || db.botState.realExecutionMode === 'REAL_BROKER' || environment === 'live';
+
     const closedItem: TradeHistoryItem = {
       id: `trd_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       symbol: pos.symbol,
@@ -212,7 +242,22 @@ export class ExecutionEngine {
       exitReason,
       environment,
       tradeExplanation: `Closed ${pos.side} ${pos.lotSize ? pos.lotSize.toFixed(2) + ' Lots' : pos.size + ' Units'} on ${pos.symbol} at $${currentPrice.toFixed(2)} (${exitReason}) with P&L: ${finalRealizedPnl >= 0 ? '+' : ''}$${finalRealizedPnl} (${pnlPercent}%).`,
+      realExecution: isRealBrokerActive,
+      ticketNumber: pos.ticketNumber,
     };
+
+    // Dispatches real close to MT5 Terminal EA & Cloud APIs
+    if (isRealBrokerActive) {
+      realBrokerBridge.dispatchRealClose({
+        positionId: pos.id,
+        ticket: pos.ticketNumber,
+        symbol: pos.symbol,
+        lotSize: pos.lotSize,
+        serverId: pos.serverId,
+      }).catch((err) => {
+        console.warn('Real broker position close dispatch notice:', err);
+      });
+    }
 
     db.tradesHistory.unshift(closedItem);
     db.positions.splice(posIndex, 1);

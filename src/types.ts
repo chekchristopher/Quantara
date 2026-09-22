@@ -149,6 +149,10 @@ export interface Position {
   serverName?: string;
   accountNumber?: string;
   brokerName?: string;
+  realExecution?: boolean;
+  ticketNumber?: number;
+  brokerFillPrice?: number;
+  brokerExecutionStatus?: 'PENDING_TERMINAL' | 'FILLED_ON_MT5' | 'SIMULATED';
 }
 
 export interface Order {
@@ -175,6 +179,8 @@ export interface Order {
   serverId?: string;
   serverName?: string;
   accountNumber?: string;
+  realExecution?: boolean;
+  ticketNumber?: number;
 }
 
 export interface TradeHistoryItem {
@@ -199,6 +205,8 @@ export interface TradeHistoryItem {
   exitReason: 'TAKE_PROFIT' | 'STOP_LOSS' | 'TRAILING_STOP' | 'KILL_SWITCH' | 'MANUAL' | 'SIGNAL_REVERSAL';
   environment: EnvironmentMode;
   tradeExplanation: string;
+  realExecution?: boolean;
+  ticketNumber?: number;
 }
 
 export interface PortfolioSummary {
@@ -243,6 +251,9 @@ export interface BotState {
   serverUptimeSeconds?: number;
   isNonStopLoop?: boolean;
   offlineSessionStats?: OfflineSessionStats;
+  realBrokerExecutionEnabled?: boolean;
+  realExecutionMode?: 'SIMULATED' | 'REAL_BROKER';
+  activeBridgeConnected?: boolean;
 }
 
 export interface OfflineTradeRecord {
@@ -342,6 +353,51 @@ export interface BrokerAccount {
   lotsTradedTotal?: number;
   peakBalance?: number;
   drawdownPercent?: number;
+  // Real MT5 Terminal Bridge Protocol
+  bridgeToken?: string;
+  executionMode?: 'SIMULATED' | 'REAL_BROKER';
+  isTerminalConnected?: boolean;
+  lastTerminalPing?: number;
+  terminalBuild?: string;
+  realOrdersExecutedCount?: number;
+  realTickets?: number[];
+}
+
+export interface RealExecutionEvent {
+  id: string;
+  timestamp: number;
+  type: 'DISPATCH' | 'FILL' | 'CLOSE' | 'SYNC' | 'ERROR' | 'REJECT';
+  message: string;
+  ticket?: number;
+  symbol: string;
+  lotSize: number;
+  price?: number;
+  pnl?: number;
+  source: 'MQL5_EA_BRIDGE' | 'METAAPI_CLOUD' | 'BROKER_WEBHOOK';
+}
+
+export interface RealBrokerBridgeStatus {
+  enabled: boolean;
+  activeMode: 'SIMULATED' | 'REAL_BROKER';
+  connectedTerminalsCount: number;
+  terminals: {
+    accountId: string;
+    accountNumber: string;
+    server: string;
+    broker: string;
+    bridgeToken: string;
+    isOnline: boolean;
+    pingMs: number;
+    terminalBuild: string;
+    lastPingTime: number;
+    balance: number;
+    equity: number;
+  }[];
+  pendingOrdersCount: number;
+  realOrdersExecutedCount: number;
+  cloudMetaApiConfigured: boolean;
+  cloudWebhookConfigured: boolean;
+  recentEvents: RealExecutionEvent[];
 }
 
 export interface ServerAccountReport {

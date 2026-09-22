@@ -8,6 +8,7 @@ import { marketDataService } from './server/marketData';
 import { ALL_STRATEGIES, getStrategyById } from './server/strategies';
 import { backtestingEngine } from './server/backtestingEngine';
 import { executionEngine } from './server/executionEngine';
+import { realBrokerBridge } from './server/realBrokerBridge';
 import { systemTestSuite } from './server/tests';
 import { geminiService } from './server/geminiService';
 import { RiskSettings, TradingMode, EnvironmentMode } from './src/types';
@@ -580,6 +581,12 @@ app.post('/api/brokers/mt5/login', (req, res) => {
     lotsTradedTotal: 0,
     peakBalance: numBalance,
     drawdownPercent: 0,
+    bridgeToken: `qnt_live_${server.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}_${login}_${Math.random().toString(36).substring(2, 7)}`,
+    executionMode: 'REAL_BROKER',
+    isTerminalConnected: false,
+    lastTerminalPing: 0,
+    realOrdersExecutedCount: 0,
+    realTickets: [],
     autoTradeControl: autoTradeControl || {
       autoTradeEnabled: true,
       prioritizeGold: true,
@@ -956,6 +963,113 @@ app.delete('/api/brokers/:id', (req, res) => {
   }
   tradingEngine.broadcastState();
   res.json({ success: true, brokerAccounts: db.brokerAccounts, botState: db.botState });
+});
+
+// -----------------------------------------------------------------------------
+// Real Broker Execution & MT5 Terminal Bridge API
+// -----------------------------------------------------------------------------
+app.get('/api/bridge/status', (req, res) => {
+  res.json({ success: true, ...realBrokerBridge.getStatus() });
+});
+
+app.get('/api/bridge/pending', (req, res) => {
+  const token = String(req.query.token || '');
+  const orders = realBrokerBridge.getPendingOrdersForToken(token);
+  res.json({ success: true, count: orders.length, orders });
+});
+
+app.post('/api/bridge/execution', (req, res) => {
+  const result = realBrokerBridge.processExecutionAck(req.body);
+  tradingEngine.broadcastState();
+  res.json(result);
+});
+
+app.post('/api/bridge/close-ack', (req, res) => {
+  const result = realBrokerBridge.processCloseAck(req.body);
+  tradingEngine.broadcastState();
+  res.json(result);
+});
+
+app.post('/api/bridge/sync', (req, res) => {
+  const result = realBrokerBridge.processTerminalSync(req.body);
+  tradingEngine.broadcastState();
+  res.json(result);
+});
+
+app.get('/api/bridge/script/download', (req, res) => {
+  const token = String(req.query.token || '');
+  const targetAcc = token ? realBrokerBridge.getAccountByToken(token) : (db.brokerAccounts.find((a) => a.isActiveForTakeover) || db.brokerAccounts[0]);
+  const host = `${req.protocol}://${req.get('host')}`;
+  const assignedToken = targetAcc?.bridgeToken || token || 'qnt_live_token';
+  const scriptContent = realBrokerBridge.generateMQL5Script(
+    host,
+    assignedToken,
+    targetAcc?.accountNumber || '10849201',
+    targetAcc?.broker || 'Exness'
+  );
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="Quantara_MT5_AutoBridge.mq5"');
+  res.send(scriptContent);
+});
+
+app.get('/api/bridge/script/code', (req, res) => {
+  const token = String(req.query.token || '');
+  const targetAcc = token ? realBrokerBridge.getAccountByToken(token) : (db.brokerAccounts.find((a) => a.isActiveForTakeover) || db.brokerAccounts[0]);
+  const host = `${req.protocol}://${req.get('host')}`;
+  const assignedToken = targetAcc?.bridgeToken || token || 'qnt_live_token';
+  const scriptContent = realBrokerBridge.generateMQL5Script(
+    host,
+    assignedToken,
+    targetAcc?.accountNumber || '10849201',
+    targetAcc?.broker || 'Exness'
+  );
+  res.json({
+    success: true,
+    code: scriptContent,
+    bridgeUrl: `${host}/api/bridge`,
+    bridgeToken: assignedToken,
+    accountNumber: targetAcc?.accountNumber || '10849201',
+    broker: targetAcc?.broker || 'Exness',
+  });
+});
+
+app.post('/api/bridge/toggle-mode', (req, res) => {
+  const { mode } = req.body;
+  const targetMode = mode === 'SIMULATED' ? 'SIMULATED' : 'REAL_BROKER';
+  realBrokerBridge.setExecutionMode(targetMode);
+  tradingEngine.broadcastState();
+  res.json({
+    success: true,
+    mode: targetMode,
+    message: targetMode === 'REAL_BROKER'
+      ? 'Real Broker Execution is now ACTIVE. All orders will route directly to live MT5 terminals & broker bridges.'
+      : 'Switched to Simulated Sandbox mode.',
+  });
+});
+
+app.post('/api/bridge/test-dispatch', async (req, res) => {
+  const { symbol = 'XAU/USD', action = 'BUY', lotSize = 0.01 } = req.body;
+  const asset = marketDataService.getAsset(symbol) || marketDataService.getGoldAsset();
+  const price = asset ? asset.currentPrice : 2650.0;
+  const isBuy = action === 'BUY';
+  const stopLoss = isBuy ? price * 0.99 : price * 1.01;
+  const takeProfit = isBuy ? price * 1.02 : price * 0.98;
+
+  const result = await realBrokerBridge.dispatchRealOrder({
+    orderId: `test_${Date.now()}`,
+    positionId: `pos_test_${Date.now()}`,
+    action: isBuy ? 'BUY' : 'SELL',
+    symbol,
+    lotSize,
+    price,
+    stopLoss,
+    takeProfit,
+    comment: 'Quantara Test Ping Order',
+  });
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, ...result });
 });
 
 // -----------------------------------------------------------------------------

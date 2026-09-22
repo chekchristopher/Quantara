@@ -48,6 +48,7 @@ import {
 import { BrokerAccount, MarketAsset, Order, PortfolioSummary, Position, TradeHistoryItem } from '../types';
 import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
 import { AccountReportView } from './AccountReportView';
+import { RealBrokerBridgeView } from './RealBrokerBridgeView';
 
 interface AccountBrokerViewProps {
   brokerAccounts: BrokerAccount[];
@@ -305,7 +306,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   user,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal' | 'report'>(
+  const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal' | 'report' | 'bridge'>(
     brokerAccounts.length === 0 ? 'login' : 'control'
   );
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -605,6 +606,19 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           >
             <Zap className="h-3.5 w-3.5" />
             <span>Trade Control</span>
+          </button>
+          <button
+            id="tab-real-broker-orders"
+            onClick={() => setActiveTab('bridge')}
+            className={`px-3 py-1.5 rounded-md font-mono text-xs font-semibold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
+              activeTab === 'bridge'
+                ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                : 'text-emerald-400 hover:text-white hover:bg-emerald-950/30'
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5 text-emerald-400 fill-emerald-400" />
+            <span>Real Broker Orders</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </button>
           <button
             onClick={() => setActiveTab('login')}
@@ -2506,6 +2520,16 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           }}
           tradesHistory={tradesHistory}
           user={user}
+          onRefresh={onRefreshData}
+        />
+      )}
+
+      {/* TAB 6: Real Broker Orders & MT5 Terminal Bridge */}
+      {activeTab === 'bridge' && (
+        <RealBrokerBridgeView
+          activeAccount={activeAccount}
+          accounts={brokerAccounts}
+          positions={positions}
           onRefresh={onRefreshData}
         />
       )}
