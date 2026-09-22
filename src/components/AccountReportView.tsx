@@ -20,6 +20,8 @@ import {
   CheckCircle,
   ExternalLink,
   HelpCircle,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 import { BrokerAccount, TradeHistoryItem, ServerAccountReport } from '../types';
 import { firestoreSync } from '../services/firestoreSync';
@@ -28,6 +30,8 @@ interface AccountReportViewProps {
   brokerAccounts: BrokerAccount[];
   selectedServerId?: string;
   onSelectServer?: (id: string) => void;
+  onDisconnectBroker?: (id: string) => Promise<any>;
+  onSwitchOrNewMT5?: () => void;
   tradesHistory: TradeHistoryItem[];
   user?: any;
   onRefresh?: () => void;
@@ -37,6 +41,8 @@ export const AccountReportView: React.FC<AccountReportViewProps> = ({
   brokerAccounts,
   selectedServerId,
   onSelectServer,
+  onDisconnectBroker,
+  onSwitchOrNewMT5,
   tradesHistory,
   user,
   onRefresh,
@@ -51,6 +57,9 @@ export const AccountReportView: React.FC<AccountReportViewProps> = ({
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [selectedTradeForAI, setSelectedTradeForAI] = useState<TradeHistoryItem | null>(null);
+  const [serverToDelete, setServerToDelete] = useState<BrokerAccount | null>(null);
+  const [isDeletingServer, setIsDeletingServer] = useState(false);
+  const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
 
   // Synchronize when prop changes
   React.useEffect(() => {
@@ -237,7 +246,31 @@ export const AccountReportView: React.FC<AccountReportViewProps> = ({
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              {onSwitchOrNewMT5 && (
+                <button
+                  type="button"
+                  onClick={onSwitchOrNewMT5}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700/80 flex items-center gap-1.5 transition-all"
+                  title="Connect a new MT5 account or switch configuration"
+                >
+                  <Plus className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Switch / New MT5</span>
+                </button>
+              )}
+
+              {onDisconnectBroker && activeServer && (
+                <button
+                  type="button"
+                  onClick={() => setServerToDelete(activeServer)}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold rounded-lg border border-red-500/30 flex items-center gap-1.5 transition-all"
+                  title={`Remove and permanently delete server ${activeServer.name || activeServer.server}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Remove Server</span>
+                </button>
+              )}
+
               <button
                 onClick={handleForceCloudSync}
                 disabled={syncingCloud}
@@ -265,6 +298,22 @@ export const AccountReportView: React.FC<AccountReportViewProps> = ({
           <div className="mt-4 p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-lg flex items-center gap-2 text-xs text-emerald-300">
             <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             <span>{syncSuccessMsg}</span>
+          </div>
+        )}
+
+        {/* Delete Feedback Message Banner */}
+        {deleteFeedback && (
+          <div className="mt-4 p-3 bg-blue-950/40 border border-blue-500/30 rounded-lg flex items-center justify-between text-xs text-blue-300">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              <span>{deleteFeedback}</span>
+            </div>
+            <button
+              onClick={() => setDeleteFeedback(null)}
+              className="text-slate-400 hover:text-white text-xs underline"
+            >
+              Dismiss
+            </button>
           </div>
         )}
       </div>
@@ -696,6 +745,73 @@ export const AccountReportView: React.FC<AccountReportViewProps> = ({
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg"
               >
                 Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Server Confirmation Modal */}
+      {serverToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0E1017] p-5 sm:p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/30">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-white">Delete Trading Server?</h4>
+                <p className="text-xs text-[#8E9299]">Confirm permanent removal from system</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-[#0A0D14] border border-[#1F2433] p-3 text-xs space-y-1 font-mono">
+              <div className="text-white font-bold">{serverToDelete.name || 'MT5 Server'}</div>
+              <div className="text-[#8E9299]">Login ID: #{serverToDelete.accountNumber}</div>
+              <div className="text-blue-400">Broker: {serverToDelete.server || serverToDelete.broker || 'Exness-MT5'}</div>
+              <div className="text-zinc-400">Environment: {serverToDelete.isPaper ? 'Demo / Proving' : 'Real Live ECN'}</div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Are you sure you want to delete server <strong className="text-white">{serverToDelete.name}</strong> (#{serverToDelete.accountNumber})?
+              This will halt its execution and permanently delete the connection credentials, performance reports, and Firebase database profile.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2433]">
+              <button
+                type="button"
+                disabled={isDeletingServer}
+                onClick={() => setServerToDelete(null)}
+                className="px-3.5 py-2 rounded-lg bg-[#141722] hover:bg-[#1A1F2E] text-zinc-300 text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingServer}
+                onClick={async () => {
+                  if (!onDisconnectBroker) return;
+                  setIsDeletingServer(true);
+                  try {
+                    await onDisconnectBroker(serverToDelete.id);
+                    setDeleteFeedback(`Server ${serverToDelete.name} was successfully deleted and removed from system.`);
+                    setServerToDelete(null);
+                    // Select next server if available
+                    const remaining = brokerAccounts.filter((a) => a.id !== serverToDelete.id);
+                    if (remaining.length > 0 && onSelectServer) {
+                      setActiveId(remaining[0].id);
+                      onSelectServer(remaining[0].id);
+                    }
+                  } catch (err: any) {
+                    setDeleteFeedback('Failed to delete server: ' + err.message);
+                  } finally {
+                    setIsDeletingServer(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono transition-colors flex items-center space-x-1.5 shadow-lg shadow-red-600/30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{isDeletingServer ? 'Deleting...' : 'Confirm Delete Server'}</span>
               </button>
             </div>
           </div>

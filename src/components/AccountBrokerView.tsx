@@ -857,6 +857,17 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                   <Plus className="h-3 w-3 text-blue-400" />
                   <span>Switch / New MT5</span>
                 </button>
+                {activeAccount && onDisconnectBroker && (
+                  <button
+                    type="button"
+                    onClick={() => setServerToDelete(activeAccount)}
+                    className="rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center space-x-1"
+                    title={`Remove and delete server ${activeAccount.name} (#${activeAccount.accountNumber})`}
+                  >
+                    <Trash2 className="h-3 w-3 text-red-400" />
+                    <span>Remove Server</span>
+                  </button>
+                )}
                 {onCloseAllMT5 && (
                   <button
                     onClick={onCloseAllMT5}
@@ -2407,65 +2418,6 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
               );
             })}
           </div>
-
-          {/* Delete Server Confirmation Modal */}
-          {serverToDelete && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-              <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0E1017] p-5 sm:p-6 space-y-4 shadow-2xl">
-                <div className="flex items-center space-x-3 text-red-400">
-                  <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/30">
-                    <Trash2 className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-base text-white">Delete Trading Server?</h4>
-                    <p className="text-xs text-[#8E9299]">Confirm permanent removal from system</p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Are you sure you want to delete server <strong className="text-white">{serverToDelete.name}</strong> (#{serverToDelete.accountNumber})?
-                  This will halt its non-stop 24/7 background execution and permanently delete the connection credentials from the system disk storage.
-                </p>
-
-                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2433]">
-                  <button
-                    type="button"
-                    disabled={isDeletingServer}
-                    onClick={() => setServerToDelete(null)}
-                    className="px-3.5 py-2 rounded-lg bg-[#141722] hover:bg-[#1A1F2E] text-zinc-300 text-xs font-semibold transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isDeletingServer}
-                    onClick={async () => {
-                      setIsDeletingServer(true);
-                      try {
-                        await onDisconnectBroker(serverToDelete.id);
-                        setFeedbackMessage({
-                          text: `Server ${serverToDelete.name} deleted and removed from system.`,
-                          type: 'info',
-                        });
-                        setServerToDelete(null);
-                      } catch (err: any) {
-                        setFeedbackMessage({
-                          text: 'Failed to delete server: ' + err.message,
-                          type: 'error',
-                        });
-                      } finally {
-                        setIsDeletingServer(false);
-                      }
-                    }}
-                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono transition-colors flex items-center space-x-1.5 shadow-lg shadow-red-600/30"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>{isDeletingServer ? 'Deleting...' : 'Confirm Delete Server'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2518,6 +2470,8 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
               onSelectActiveBroker(id);
             }
           }}
+          onDisconnectBroker={onDisconnectBroker}
+          onSwitchOrNewMT5={() => setActiveTab('login')}
           tradesHistory={tradesHistory}
           user={user}
           onRefresh={onRefreshData}
@@ -2532,6 +2486,72 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           positions={positions}
           onRefresh={onRefreshData}
         />
+      )}
+
+      {/* Delete Server Confirmation Modal (Available across all tabs) */}
+      {serverToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/40 bg-[#0E1017] p-5 sm:p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/30">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-white">Delete Trading Server?</h4>
+                <p className="text-xs text-[#8E9299]">Confirm permanent removal from system</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-[#0A0D14] border border-[#1F2433] p-3 text-xs space-y-1 font-mono">
+              <div className="text-white font-bold">{serverToDelete.name || 'MT5 Account'}</div>
+              <div className="text-[#8E9299]">Login ID: #{serverToDelete.accountNumber}</div>
+              <div className="text-blue-400">Server: {serverToDelete.server || 'Exness-MT5'}</div>
+              <div className="text-zinc-400">Environment: {serverToDelete.isPaper ? 'Demo / Proving' : 'Real Live ECN'}</div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              Are you sure you want to delete server <strong className="text-white">{serverToDelete.name}</strong> (#{serverToDelete.accountNumber})?
+              This will halt its non-stop 24/7 background execution and permanently delete the connection credentials and records from system storage and cloud database.
+            </p>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2433]">
+              <button
+                type="button"
+                disabled={isDeletingServer}
+                onClick={() => setServerToDelete(null)}
+                className="px-3.5 py-2 rounded-lg bg-[#141722] hover:bg-[#1A1F2E] text-zinc-300 text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingServer}
+                onClick={async () => {
+                  setIsDeletingServer(true);
+                  try {
+                    await onDisconnectBroker(serverToDelete.id);
+                    setFeedbackMessage({
+                      text: `Server ${serverToDelete.name} deleted and permanently removed from system.`,
+                      type: 'info',
+                    });
+                    setServerToDelete(null);
+                  } catch (err: any) {
+                    setFeedbackMessage({
+                      text: 'Failed to delete server: ' + err.message,
+                      type: 'error',
+                    });
+                  } finally {
+                    setIsDeletingServer(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono transition-colors flex items-center space-x-1.5 shadow-lg shadow-red-600/30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{isDeletingServer ? 'Deleting...' : 'Confirm Delete Server'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

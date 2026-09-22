@@ -25,6 +25,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { BacktestRequest, BacktestResult, StrategyConfig } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 interface BacktestingViewProps {
   strategies: StrategyConfig[];
@@ -32,6 +33,7 @@ interface BacktestingViewProps {
 }
 
 export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, onRunBacktest }) => {
+  const { isDark } = useTheme();
   const [symbol, setSymbol] = useState('BTC/USD');
   const [strategyId, setStrategyId] = useState('adaptive-regime');
   const [timeframe, setTimeframe] = useState<'1m' | '15m' | '1h'>('1h');
@@ -272,11 +274,11 @@ export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, on
             <div className="h-72 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={result.equityCurve} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1F1F23" vertical={false} />
-                  <XAxis dataKey="time" stroke="#8E9299" fontSize={10} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1F1F23' : '#E2E8F0'} vertical={false} />
+                  <XAxis dataKey="time" stroke={isDark ? '#8E9299' : '#64748B'} fontSize={10} tickLine={false} />
                   <YAxis
                     domain={['auto', 'auto']}
-                    stroke="#8E9299"
+                    stroke={isDark ? '#8E9299' : '#64748B'}
                     fontSize={10}
                     orientation="right"
                     tickLine={false}
@@ -284,12 +286,15 @@ export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, on
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#0A0A0B',
-                      borderColor: '#1F1F23',
+                      backgroundColor: isDark ? '#0A0A0B' : '#FFFFFF',
+                      borderColor: isDark ? '#1F1F23' : '#CBD5E1',
                       borderRadius: '8px',
                       fontSize: '11px',
                       fontFamily: 'monospace',
-                      color: '#E4E4E7',
+                      color: isDark ? '#E4E4E7' : '#0F172A',
+                      boxShadow: isDark
+                        ? '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                        : '0 10px 15px -3px rgba(15, 23, 42, 0.1)',
                     }}
                   />
                   <Area
@@ -302,7 +307,7 @@ export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, on
                   />
                   <defs>
                     <linearGradient id="btGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={isDark ? 0.25 : 0.18} />
                       <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
