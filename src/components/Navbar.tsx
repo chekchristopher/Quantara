@@ -23,6 +23,7 @@ import {
 import { BotState, NotificationItem, OfflineSessionStats, RiskSettings } from '../types';
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useAuth } from '../context/AuthContext';
+import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
   currentTab: string;
@@ -334,6 +335,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               <AlertOctagon className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden xs:inline">{riskSettings.killSwitchActive ? 'LOCKED' : 'STOP'}</span>
             </button>
+
+            {/* Dark / Light Theme Toggle */}
+            <ThemeToggle variant="compact" />
 
             {/* Notifications Button */}
             <div className="relative">
@@ -664,6 +668,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Drawer Theme & Appearance Switcher */}
+            <div className="px-4 py-3 border-t border-[#1E2330] bg-[#0E121E]/60 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-white">Appearance Theme</p>
+                <p className="text-[10px] font-mono text-[#8E9299]">Light or Dark institutional mode</p>
+              </div>
+              <ThemeToggle variant="segmented" />
             </div>
 
             {/* Drawer Bottom Footer */}

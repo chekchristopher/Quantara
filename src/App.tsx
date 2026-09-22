@@ -18,6 +18,7 @@ import { OfflineWealthReportModal } from './components/OfflineWealthReportModal'
 import { LandingPageView } from './components/LandingPageView';
 import { MarketTickerRibbon } from './components/MarketTickerRibbon';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { firestoreSync } from './services/firestoreSync';
 import { QuantaraLogoMark } from './components/QuantaraLogo';
 import { api, SnapshotData } from './services/api';
@@ -40,6 +41,7 @@ import {
 
 function QuantaraApp() {
   const { user, profile, cloudSyncStatus } = useAuth();
+  const { isDark } = useTheme();
   const [currentTab, setCurrentTab] = useState<string>('landing');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
@@ -563,7 +565,11 @@ function QuantaraApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-[#E4E4E7] flex flex-col antialiased selection:bg-blue-600/30 selection:text-blue-300">
+    <div
+      className={`min-h-screen ${
+        isDark ? 'bg-[#0A0A0B] text-[#E4E4E7]' : 'bg-[#F1F5F9] text-[#0F172A]'
+      } flex flex-col antialiased selection:bg-blue-600/25 selection:text-blue-600 transition-colors duration-200`}
+    >
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
@@ -878,9 +884,11 @@ function QuantaraApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <QuantaraApp />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QuantaraApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

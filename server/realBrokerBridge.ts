@@ -225,36 +225,52 @@ export class RealBrokerBridge {
    * Acknowledges real order execution from MT5 Terminal EA.
    */
   public processExecutionAck(ack: {
-    token: string;
-    orderId: string;
+    token?: string;
+    orderId?: string;
+    bridgeOrderId?: string;
     positionId?: string;
     ticket: number;
-    executedPrice: number;
+    executedPrice?: number;
+    fillPrice?: number;
+    price?: number;
     spreadPoints?: number;
     slippagePoints?: number;
-    success: boolean;
+    success?: boolean;
     comment?: string;
+    lotSize?: number;
+    accountNumber?: string;
   }): { success: boolean; message: string } {
-    const account = this.getAccountByToken(ack.token);
+    const executedPrice = Number(ack.executedPrice ?? ack.fillPrice ?? ack.price ?? 0);
+    const orderId = ack.orderId || ack.bridgeOrderId;
+
+    const account =
+      (ack.token && this.getAccountByToken(ack.token)) ||
+      (ack.accountNumber && db.brokerAccounts.find((a) => a.accountNumber === ack.accountNumber)) ||
+      db.brokerAccounts.find((a) => a.isActiveForTakeover) ||
+      db.brokerAccounts[0];
 
     // Remove acknowledged order from pending queue
-    this.pendingQueue = this.pendingQueue.filter((p) => p.orderId !== ack.orderId);
+    this.pendingQueue = this.pendingQueue.filter(
+      (p) => p.orderId !== orderId && p.id !== ack.bridgeOrderId && p.id !== orderId
+    );
 
     // Update matching position in db.positions
-    const pos = db.positions.find((p) => p.id === ack.positionId || (p as any).orderId === ack.orderId);
+    const pos = db.positions.find(
+      (p) => (ack.positionId && p.id === ack.positionId) || (orderId && (p as any).orderId === orderId)
+    );
     if (pos) {
       pos.ticketNumber = ack.ticket;
-      pos.brokerFillPrice = ack.executedPrice;
+      pos.brokerFillPrice = executedPrice > 0 ? executedPrice : pos.entryPrice;
       pos.brokerExecutionStatus = 'FILLED_ON_MT5';
       pos.realExecution = true;
     }
 
     // Update order in db.orders
-    const ord = db.orders.find((o) => o.id === ack.orderId);
+    const ord = db.orders.find((o) => o.id === orderId);
     if (ord) {
       ord.ticketNumber = ack.ticket;
       ord.realExecution = true;
-      ord.averageFillPrice = ack.executedPrice;
+      ord.averageFillPrice = executedPrice > 0 ? executedPrice : ord.price;
     }
 
     // Update account metrics
@@ -267,22 +283,24 @@ export class RealBrokerBridge {
       db.persistAccounts();
     }
 
+    const priceLabel = executedPrice > 0 ? `$${executedPrice.toFixed(2)}` : 'Market Price';
+
     this.addEvent({
       id: `evt_ack_${Date.now()}`,
       timestamp: Date.now(),
       type: 'FILL',
-      message: `REAL BROKER EXECUTION CONFIRMED: MT5 Ticket #${ack.ticket} filled at $${ack.executedPrice.toFixed(2)}.`,
+      message: `REAL BROKER EXECUTION CONFIRMED: MT5 Ticket #${ack.ticket} filled at ${priceLabel}.`,
       ticket: ack.ticket,
       symbol: pos?.symbol || 'ASSET',
-      lotSize: pos?.lotSize || 0.01,
-      price: ack.executedPrice,
+      lotSize: pos?.lotSize || ack.lotSize || 0.01,
+      price: executedPrice,
       source: 'MQL5_EA_BRIDGE',
     });
 
     db.addAuditLog(
       'TRADE',
       'REAL_BROKER_EXECUTION_CONFIRMED',
-      `Live Broker Terminal filled Ticket #${ack.ticket} on ${pos?.symbol || 'Trade'} @ $${ack.executedPrice} (Account #${account?.accountNumber || 'Terminal'}).`,
+      `Live Broker Terminal filled Ticket #${ack.ticket} on ${pos?.symbol || 'Trade'} @ ${priceLabel} (Account #${account?.accountNumber || 'Terminal'}).`,
       'INFO'
     );
 

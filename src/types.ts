@@ -61,6 +61,54 @@ export interface MarketAsset {
   recommendationReason?: string;
 }
 
+export interface OrderBookLevel {
+  price: number;
+  size: number;
+  total: number;
+  depthPercent: number; // 0 to 100
+  orderCount?: number;
+  isSignificantWall?: boolean;
+  densityScore: number; // 0.0 to 1.0 (relative concentration)
+  volatilityImpact: number; // 0.0 to 1.0 (volatility shock index)
+  isPriceGap?: boolean; // Thin liquidity / air pocket
+  liquidityTier: 'WALL' | 'HIGH' | 'NORMAL' | 'THIN' | 'GAP';
+}
+
+export interface HeatmapHistoricalFrame {
+  timestamp: number;
+  midPrice: number;
+  levels: {
+    price: number;
+    size: number;
+    densityScore: number;
+    side: 'BID' | 'ASK';
+    isGap: boolean;
+    isWall: boolean;
+  }[];
+}
+
+export interface OrderBookDepthData {
+  symbol: string;
+  timestamp: number;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  spread: number;
+  spreadPips: number;
+  midPrice: number;
+  totalBidVolume: number;
+  totalAskVolume: number;
+  bidRatio: number; // 0 to 100
+  askRatio: number; // 0 to 100
+  sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  imbalanceDelta: number; // positive = bid heavy, negative = ask heavy
+  depthLevelsCount: number;
+  topBidWall?: number;
+  topAskWall?: number;
+  volatilityIndex: number; // ATR/Regime based volatility pressure (0 - 100)
+  liquidityGapsCount: number; // count of detected low liquidity air pockets
+  maxLevelDensity: number;
+}
+
 export interface StrategyConfig {
   id: string;
   name: string;

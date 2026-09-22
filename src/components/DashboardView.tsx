@@ -55,6 +55,8 @@ import {
   TradingMode,
 } from '../types';
 import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
+import { OrderBookDepthVisualizer } from './OrderBookDepthVisualizer';
+import { useTheme } from '../context/ThemeContext';
 
 interface DashboardViewProps {
   portfolio: PortfolioSummary;
@@ -89,6 +91,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenExplanationModal,
   onNavigateTab,
 }) => {
+  const { isDark } = useTheme();
   const [selectedSymbol, setSelectedSymbol] = useState<string>('XAU/USD');
   const [marketFilter, setMarketFilter] = useState<'all' | 'crypto' | 'forex'>('all');
   const [activeTimeframe, setActiveTimeframe] = useState<'1m' | '5m' | '15m' | '1h'>('1m');
@@ -807,11 +810,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F23" vertical={false} />
-                <XAxis dataKey="time" stroke="#8E9299" fontSize={10} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1F1F23' : '#E2E8F0'} vertical={false} />
+                <XAxis dataKey="time" stroke={isDark ? '#8E9299' : '#64748B'} fontSize={10} tickLine={false} />
                 <YAxis
                   domain={['auto', 'auto']}
-                  stroke="#8E9299"
+                  stroke={isDark ? '#8E9299' : '#64748B'}
                   fontSize={10}
                   orientation="right"
                   tickLine={false}
@@ -819,12 +822,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#0E0E11',
-                    borderColor: '#1F1F23',
+                    backgroundColor: isDark ? '#0E0E11' : '#FFFFFF',
+                    borderColor: isDark ? '#1F1F23' : '#CBD5E1',
                     borderRadius: '8px',
                     fontSize: '11px',
                     fontFamily: 'monospace',
-                    color: '#E4E4E7',
+                    color: isDark ? '#E4E4E7' : '#0F172A',
+                    boxShadow: isDark
+                      ? '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                      : '0 10px 15px -3px rgba(15, 23, 42, 0.1)',
                   }}
                   itemStyle={{ padding: '1px 0' }}
                 />
@@ -888,6 +894,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
           )}
+
+          {/* Real-Time Order Book Depth Visualizer */}
+          <OrderBookDepthVisualizer
+            assets={assets}
+            selectedSymbol={selectedSymbol}
+            onSelectSymbol={(sym) => setSelectedSymbol(sym)}
+            onSelectPrice={(_price, side) => {
+              setManualSide(side === 'BUY' ? 'LONG' : 'SHORT');
+            }}
+          />
         </div>
 
         {/* Right Column: Bot Status, Mode & Manual Trade Ticket (4 cols) */}

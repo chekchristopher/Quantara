@@ -38,6 +38,349 @@ body,
   scrollbar-width: none;
 }
 
+/* Theme Transition for smooth switching */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *:before,
+html.theme-transition *:after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease !important;
+  transition-delay: 0 !important;
+}
+
+/* ==========================================================================
+   LIGHT MODE INSTITUTIONAL THEME OVERRIDES
+   ========================================================================== */
+
+html.light,
+html[data-theme="light"],
+body.light {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* 1. Page Canvas & App Root */
+html.light .min-h-screen,
+html.light .min-h-screen.bg-\[\#0A0A0B\],
+html.light div.bg-\[\#0A0A0B\] {
+  background-color: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* 2. Elevated Cards & Structural Modules (Crisp White on Slate Canvas) */
+html.light .bg-\[\#141416\],
+html.light .bg-\[\#0E0E11\],
+html.light .bg-\[\#09090B\],
+html.light .bg-\[\#0D1017\],
+html.light .bg-\[\#0A0D14\],
+html.light .bg-\[\#0A0D15\],
+html.light .bg-\[\#070709\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03) !important;
+}
+
+/* 3. Sub-Panels, Wells, Inner Boxes & Table Headers (Slate 50) */
+html.light .bg-\[\#12131A\],
+html.light .bg-\[\#141724\],
+html.light .bg-\[\#141418\],
+html.light .bg-\[\#121622\],
+html.light .bg-\[\#141722\],
+html.light .bg-\[\#0E1420\],
+html.light .bg-\[\#101420\],
+html.light .bg-\[\#0E121B\],
+html.light .bg-\[\#0E1017\],
+html.light .bg-\[\#121724\],
+html.light .bg-\[\#121624\],
+html.light .bg-\[\#1E1E24\],
+html.light .bg-\[\#181920\],
+html.light .bg-\[\#1A1D24\],
+html.light .bg-\[\#0D0E13\],
+html.light .bg-\[\#10131C\],
+html.light .bg-\[\#090C12\] {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+}
+
+/* 4. Interactive Pills, Inactive Chips & Segmented Selectors */
+html.light .bg-\[\#1F1F23\],
+html.light .bg-\[\#2E2E33\],
+html.light .bg-\[\#2A2A30\],
+html.light .bg-\[\#27272A\],
+html.light .bg-\[\#1E222E\],
+html.light .bg-\[\#1C202E\],
+html.light .bg-\[\#151924\],
+html.light .bg-\[\#1B1D24\],
+html.light .bg-zinc-800,
+html.light .bg-zinc-900 {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+  color: #334155 !important;
+}
+
+html.light .bg-\[\#1F1F23\]:hover,
+html.light .bg-\[\#27272A\]:hover,
+html.light .hover\:bg-\[\#27272A\]:hover,
+html.light .hover\:bg-\[\#1F1F23\]:hover {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+/* 5. Navbars, Headers & Floating Dock */
+html.light header.bg-\[\#0E0E11\]\/95,
+html.light nav.bg-\[\#0E0E11\]\/95,
+html.light .bg-\[\#0E0E11\]\/95,
+html.light .bg-\[\#090C12\]\/90,
+html.light .bg-\[\#0A0D14\]\/95,
+html.light .bg-\[\#141416\]\/95,
+html.light header {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
+}
+
+html.light nav.fixed.bottom-0 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-top: 1px solid #E2E8F0 !important;
+  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* 6. FinTech Borders */
+html.light .border-\[\#1F1F23\],
+html.light .border-\[\#27272A\],
+html.light .border-\[\#2E2E33\],
+html.light .border-\[\#1E2330\],
+html.light .border-\[\#232A3B\],
+html.light .border-\[\#1F2633\],
+html.light .border-\[\#202534\],
+html.light .border-\[\#262B3B\],
+html.light .border-\[\#1C2130\],
+html.light .border-\[\#1F2433\],
+html.light .border-\[\#1A2030\],
+html.light .border-\[\#2E2E35\],
+html.light .border-\[\#222838\],
+html.light .border-\[\#1C2232\],
+html.light .border-\[\#1E222E\],
+html.light .border-\[\#2B3248\],
+html.light .border-zinc-800,
+html.light .border-zinc-700 {
+  border-color: #E2E8F0 !important;
+}
+
+html.light .divide-\[\#1F1F23\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #F1F5F9 !important;
+}
+
+/* 7. High-Contrast Typography (Slate-900 / Slate-600) */
+html.light .text-\[\#E4E4E7\],
+html.light .text-zinc-100,
+html.light .text-zinc-200,
+html.light .text-zinc-300,
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0F172A !important;
+}
+
+html.light .text-\[\#8E9299\],
+html.light .text-\[\#6E7382\],
+html.light .text-\[\#787E92\],
+html.light .text-\[\#7B8194\],
+html.light .text-\[\#9499A8\],
+html.light .text-\[\#71717A\],
+html.light .text-\[\#A1A1AA\],
+html.light .text-zinc-400,
+html.light .text-zinc-500,
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #475569 !important;
+}
+
+/* Headings and Titles */
+html.light h1.text-white,
+html.light h2.text-white,
+html.light h3.text-white,
+html.light h4.text-white,
+html.light .font-brand.text-white,
+html.light p.text-white,
+html.light div.text-white:not([class*="bg-blue-600"]):not([class*="bg-emerald-600"]):not([class*="bg-red-600"]),
+html.light span.text-white:not([class*="bg-blue-600"]):not([class*="bg-emerald-600"]):not([class*="bg-red-600"]) {
+  color: #0F172A !important;
+}
+
+/* 8. Institutional Financial Badges (Legible & WCAG AA Compliant) */
+/* Emerald / Bullish / Profit */
+html.light .text-\[\#10B981\],
+html.light .text-emerald-400 {
+  color: #047857 !important;
+}
+
+html.light .bg-\[\#10B981\]\/10,
+html.light .bg-\[\#10B981\]\/15,
+html.light .bg-\[\#10B981\]\/20,
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15,
+html.light .bg-emerald-500\/20 {
+  background-color: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+  color: #047857 !important;
+}
+
+/* Crimson / Bearish / Loss / Danger */
+html.light .text-\[\#EF4444\],
+html.light .text-red-400,
+html.light .text-rose-400 {
+  color: #DC2626 !important;
+}
+
+html.light .bg-\[\#EF4444\]\/10,
+html.light .bg-\[\#EF4444\]\/15,
+html.light .bg-\[\#EF4444\]\/20,
+html.light .bg-red-500\/10,
+html.light .bg-red-500\/15,
+html.light .bg-red-500\/20,
+html.light .bg-rose-500\/10,
+html.light .bg-rose-500\/15,
+html.light .bg-rose-500\/20 {
+  background-color: #FEF2F2 !important;
+  border-color: #FECACA !important;
+  color: #DC2626 !important;
+}
+
+/* Corporate Blue / Terminal / Info */
+html.light .text-blue-400,
+html.light .text-blue-300 {
+  color: #1D4ED8 !important;
+}
+
+html.light .bg-blue-500\/10,
+html.light .bg-blue-500\/15,
+html.light .bg-blue-500\/20,
+html.light .bg-blue-600\/10,
+html.light .bg-blue-600\/20,
+html.light .bg-blue-950\/20,
+html.light .bg-blue-950\/25 {
+  background-color: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+  color: #1D4ED8 !important;
+}
+
+/* Amber / Gold / Spot Gold / Sizing Warning */
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light .text-yellow-300,
+html.light .text-yellow-400 {
+  color: #B45309 !important;
+}
+
+html.light .bg-amber-500\/10,
+html.light .bg-amber-500\/15,
+html.light .bg-amber-500\/20,
+html.light .bg-yellow-500\/10,
+html.light .bg-yellow-500\/15,
+html.light .bg-yellow-500\/20 {
+  background-color: #FFFBEB !important;
+  border-color: #FDE68A !important;
+  color: #B45309 !important;
+}
+
+/* Purple / AI Explanation */
+html.light .text-purple-300,
+html.light .text-purple-400 {
+  color: #6D28D9 !important;
+}
+
+html.light .bg-purple-500\/10,
+html.light .bg-purple-500\/20 {
+  background-color: #F5F3FF !important;
+  border-color: #DDD6FE !important;
+  color: #6D28D9 !important;
+}
+
+/* 9. Order Execution Ticket Buy / Sell Buttons */
+html.light button.border-\[\#10B981\].bg-\[\#10B981\]\/20 {
+  background-color: #059669 !important;
+  border-color: #047857 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.25) !important;
+}
+
+html.light button.border-\[\#10B981\].bg-\[\#10B981\]\/20 * {
+  color: #FFFFFF !important;
+}
+
+html.light button.border-\[\#EF4444\].bg-\[\#EF4444\]\/20 {
+  background-color: #DC2626 !important;
+  border-color: #B91C1C !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.25) !important;
+}
+
+html.light button.border-\[\#EF4444\].bg-\[\#EF4444\]\/20 * {
+  color: #FFFFFF !important;
+}
+
+/* 10. Forms, Inputs & Select Elements */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #2563EB !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94A3B8 !important;
+}
+
+/* 11. Gradients & Ticker Ribbon Fade Masks */
+html.light .from-\[\#0A0D14\] {
+  --tw-gradient-from: #FFFFFF var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+html.light .from-\[\#0C1427\],
+html.light .from-blue-950\/20 {
+  --tw-gradient-from: #EFF6FF var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #F8FAFC var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+/* Depth Ladder Row Hovers */
+html.light .hover\:bg-rose-950\/30:hover {
+  background-color: #FFF1F2 !important;
+}
+
+html.light .hover\:bg-emerald-950\/30:hover {
+  background-color: #ECFDF5 !important;
+}
+
+html.light .bg-rose-500\/15 {
+  background-color: rgba(244, 63, 94, 0.12) !important;
+}
+
+html.light .bg-emerald-500\/15 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+}
+
+/* 12. Elevated Modals & Menus */
+html.light .shadow-2xl,
+html.light .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
+}
+
+html.light footer.bg-\[\#0E0E11\] {
+  background-color: #FFFFFF !important;
+  border-top-color: #E2E8F0 !important;
+}
+
 /* Market Price Ticker Ribbon Animations */
 @keyframes ticker-oscillate {
   0% {

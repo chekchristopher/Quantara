@@ -13,6 +13,7 @@ import { systemTestSuite } from './server/tests';
 import { geminiService } from './server/geminiService';
 import { RiskSettings, TradingMode, EnvironmentMode } from './src/types';
 import { calculateEquityLotSize } from './src/utils/lotSize';
+import { generateOrderBookDepth } from './src/utils/orderBook';
 
 dotenv.config();
 
@@ -398,6 +399,17 @@ app.get('/api/market/status', (req, res) => {
     forexCount: marketDataService.getForexAssets().length,
     cryptoCount: marketDataService.getCryptoAssets().length,
   });
+});
+
+app.get('/api/market/depth', (req, res) => {
+  const symbol = (req.query.symbol as string) || 'XAU/USD';
+  const levels = parseInt(req.query.levels as string) || 10;
+  const asset = marketDataService.getAsset(symbol) || marketDataService.getAsset('XAU/USD');
+  if (!asset) {
+    return res.status(404).json({ error: `Asset '${symbol}' not found` });
+  }
+  const depth = generateOrderBookDepth(asset, levels);
+  res.json(depth);
 });
 
 app.post('/api/market/sync-live', async (req, res) => {
@@ -1050,7 +1062,7 @@ app.post('/api/bridge/toggle-mode', (req, res) => {
 
 app.post('/api/bridge/test-dispatch', async (req, res) => {
   const { symbol = 'XAU/USD', action = 'BUY', lotSize = 0.01 } = req.body;
-  const asset = marketDataService.getAsset(symbol) || marketDataService.getGoldAsset();
+  const asset = marketDataService.getAsset(symbol) || marketDataService.getAsset('XAU/USD');
   const price = asset ? asset.currentPrice : 2650.0;
   const isBuy = action === 'BUY';
   const stopLoss = isBuy ? price * 0.99 : price * 1.01;

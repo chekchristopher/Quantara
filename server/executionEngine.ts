@@ -133,7 +133,7 @@ export class ExecutionEngine {
       realBrokerBridge.dispatchRealOrder({
         orderId: order.id,
         positionId: position.id,
-        action: signal.direction,
+        action: signal.direction === 'SELL' ? 'SELL' : 'BUY',
         symbol: signal.assetSymbol,
         lotSize,
         price: fillPrice,
