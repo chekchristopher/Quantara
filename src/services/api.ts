@@ -9,6 +9,7 @@ import {
   Order,
   PortfolioSummary,
   Position,
+  RiskProfileType,
   RiskSettings,
   StrategyConfig,
   TradeHistoryItem,
@@ -224,13 +225,27 @@ export const api = {
     return res.json();
   },
 
-  // Risk Settings
+  // Risk Settings & Profiles
   async updateRiskSettings(settings: Partial<RiskSettings>): Promise<{ success: boolean; riskSettings: RiskSettings }> {
     const res = await fetch('/api/risk/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings),
     });
+    return res.json();
+  },
+
+  async setRiskProfile(profileId: RiskProfileType): Promise<{ success: boolean; activeProfile: RiskProfileType; riskSettings: RiskSettings }> {
+    const res = await fetch('/api/risk/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId }),
+    });
+    return res.json();
+  },
+
+  async getRiskProfiles(): Promise<{ activeProfile: RiskProfileType; profiles: Record<string, any> }> {
+    const res = await fetch('/api/risk/profiles');
     return res.json();
   },
 

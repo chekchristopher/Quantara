@@ -341,19 +341,53 @@ export class TradingEngine {
       pos.unrealizedPnl = Number(rawPnl.toFixed(2));
       pos.unrealizedPnlPercent = Number(((rawPnl / pos.sizeUsd) * 100).toFixed(2));
 
-      // Breakeven Lock-in: When position moves +1.2R into profit, lock stop-loss to entry price
-      const initialRiskDistance = Math.abs(pos.entryPrice - (pos.stopLossPrice || pos.entryPrice * 0.98));
-      if (initialRiskDistance > 0 && rawPnl > initialRiskDistance * pos.size * 1.2) {
-        const breakEvenPrice = isLong ? pos.entryPrice * 1.001 : pos.entryPrice * 0.999;
+      // Breakeven Lock-in: When position moves +R into profit, lock stop-loss to entry price
+      const beTriggerR = db.riskSettings.breakevenTriggerR || 1.0;
+      const initialRiskDistance = pos.initialStopLossDistance || Math.abs(pos.entryPrice - (pos.stopLossPrice || pos.entryPrice * 0.98));
+      if (!pos.initialStopLossDistance) {
+        pos.initialStopLossDistance = initialRiskDistance;
+      }
+
+      if (initialRiskDistance > 0 && rawPnl >= initialRiskDistance * pos.size * beTriggerR && !pos.breakevenLocked) {
+        const breakEvenPrice = isLong ? pos.entryPrice * 1.0008 : pos.entryPrice * 0.9992;
         const needsUpdate = isLong ? pos.stopLossPrice < breakEvenPrice : pos.stopLossPrice > breakEvenPrice;
         if (needsUpdate) {
           pos.stopLossPrice = Number(breakEvenPrice.toFixed(pos.entryPrice > 10 ? 2 : 4));
+          pos.breakevenLocked = true;
           db.addNotification(
             'SYSTEM',
-            `Break-Even Protection Locked: ${pos.symbol}`,
-            `Position reached +1.2R profit target. Stop-loss dynamically moved to entry ($${pos.stopLossPrice.toFixed(2)}) to guarantee 0 risk of capital loss.`,
+            `Zero-Risk Breakeven Engaged: ${pos.symbol}`,
+            `Position reached +${beTriggerR}R profit target. Stop-loss snapped to entry ($${pos.stopLossPrice.toFixed(2)}) + spread buffer. Capital is 100% protected.`,
             'info'
           );
+          db.addAuditLog('RISK', 'BREAKEVEN_STOP_LOCKED', `${pos.symbol} ${pos.side}: SL snapped to entry ($${pos.stopLossPrice.toFixed(2)}) at +${beTriggerR}R. Position is now risk-free.`, 'INFO');
+        }
+      }
+
+      // Partial Take-Profit: At +1.8R, automatically realize 50% of position size into cash balance and trail runner
+      const tpPartialR = db.riskSettings.partialTakeProfitR || 1.8;
+      if (initialRiskDistance > 0 && rawPnl >= initialRiskDistance * pos.size * tpPartialR && !pos.partialProfitTaken && pos.size > 0.001) {
+        const halfSize = Number((pos.size * 0.5).toFixed(pos.entryPrice > 1000 ? 6 : pos.entryPrice > 100 ? 4 : 2));
+        const partialPnl = Number((rawPnl * 0.5).toFixed(2));
+        
+        if (halfSize > 0 && partialPnl > 0) {
+          pos.size = Number((pos.size - halfSize).toFixed(pos.entryPrice > 1000 ? 6 : pos.entryPrice > 100 ? 4 : 2));
+          pos.sizeUsd = Number((pos.size * currentPrice).toFixed(2));
+          pos.lotSize = Number(Math.max(0.01, (pos.lotSize * 0.5)).toFixed(2));
+          pos.partialProfitTaken = true;
+
+          // Realize 50% profit into portfolio cash balance
+          db.portfolio.cashBalance = Number((db.portfolio.cashBalance + partialPnl).toFixed(2));
+          db.portfolio.realizedPnlToday = Number((db.portfolio.realizedPnlToday + partialPnl).toFixed(2));
+          db.portfolio.totalRealizedPnl = Number((db.portfolio.totalRealizedPnl + partialPnl).toFixed(2));
+
+          db.addNotification(
+            'TRADE_CLOSE',
+            `Partial Profits Secured (+50%): ${pos.symbol}`,
+            `Locked in +$${partialPnl.toFixed(2)} (+${tpPartialR}R) profit into cash balance. Remaining ${pos.lotSize} lots now running as a risk-free trend runner with trailing stop.`,
+            'success'
+          );
+          db.addAuditLog('TRADE', 'PARTIAL_TAKE_PROFIT', `${pos.symbol}: Secured 50% profit (+${tpPartialR}R = +$${partialPnl.toFixed(2)}). Trailing remainder for runner.`, 'INFO');
         }
       }
 

@@ -11,9 +11,10 @@ import { executionEngine } from './server/executionEngine';
 import { realBrokerBridge } from './server/realBrokerBridge';
 import { systemTestSuite } from './server/tests';
 import { geminiService } from './server/geminiService';
-import { RiskSettings, TradingMode, EnvironmentMode } from './src/types';
+import { RiskSettings, TradingMode, EnvironmentMode, RiskProfileType } from './src/types';
 import { calculateEquityLotSize } from './src/utils/lotSize';
 import { generateOrderBookDepth } from './src/utils/orderBook';
+import { RISK_PROFILES, getProfileSettings } from './src/data/riskProfiles';
 
 dotenv.config();
 
@@ -542,10 +543,44 @@ app.get('/api/backtest/history', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 8. Risk Settings & Configuration
+// 8. Risk Settings & Configuration (Including Institutional Risk Profiles)
 // -----------------------------------------------------------------------------
 app.get('/api/risk/settings', (req, res) => {
   res.json(db.riskSettings);
+});
+
+app.get('/api/risk/profiles', (req, res) => {
+  res.json({
+    activeProfile: db.riskSettings.activeRiskProfile || 'BALANCED',
+    profiles: RISK_PROFILES,
+  });
+});
+
+app.post('/api/risk/profile', (req, res) => {
+  const { profileId } = req.body as { profileId: RiskProfileType };
+  if (!profileId || !RISK_PROFILES[profileId]) {
+    return res.status(400).json({ error: 'Invalid risk profile ID provided.' });
+  }
+
+  const profileSettings = getProfileSettings(profileId);
+  db.riskSettings = { ...db.riskSettings, ...profileSettings };
+  
+  const profile = RISK_PROFILES[profileId];
+  db.addAuditLog(
+    'RISK',
+    'RISK_PROFILE_ENGAGED',
+    `Institutional Risk Profile changed to [${profile.name}]. Risk/trade: ${profile.maxRiskPerTradePercent}%, Max Daily Loss: ${profile.maxDailyLossPercent}%, Min R:R: 1:${profile.minRiskRewardRatio}.`,
+    'INFO'
+  );
+  db.addNotification(
+    'SYSTEM',
+    `Risk Profile Activated: ${profile.name}`,
+    `Trading bot updated to ${profile.badge}. Risk per trade: ${profile.maxRiskPerTradePercent}%, Max daily loss: ${profile.maxDailyLossPercent}%, Breakeven lock: +${profile.breakevenTriggerR}R.`,
+    'info'
+  );
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, activeProfile: profileId, riskSettings: db.riskSettings });
 });
 
 app.post('/api/risk/settings', (req, res) => {

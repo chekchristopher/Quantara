@@ -385,10 +385,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 Takeover: {botState.autonomousTakeover ? 'Engaged' : 'Standby'}
               </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('risk')}
+                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 transition-colors cursor-pointer"
+                title="Active Risk Profile. Click to inspect or change."
+              >
+                <ShieldCheck className="h-3 w-3 mr-0.5 inline" />
+                <span>Risk Profile: {riskSettings.activeRiskProfile || 'BALANCED'} ({riskSettings.maxRiskPerTradePercent}% • 1:{riskSettings.minRiskRewardRatio || 2.5} R:R)</span>
+              </button>
             </div>
             <p className="text-[11px] sm:text-xs text-[#8E9299] mt-0.5 leading-relaxed">
               {botState.autonomousTakeover
-                ? `System is actively trading account #${botState.activeBrokerAccountId || 'primary'} with strict asymmetric 1:2.5+ risk-reward filters.`
+                ? `System is actively trading account #${botState.activeBrokerAccountId || 'primary'} under ${riskSettings.activeRiskProfile || 'BALANCED'} profile with automatic breakeven locks (+${riskSettings.breakevenTriggerR || 1.0}R) and 1:${riskSettings.minRiskRewardRatio || 2.5}+ R:R expectancy.`
                 : 'Connect your demo or live account to let Quantara autonomously execute asymmetric micro-compounding trades.'}
             </p>
           </div>
@@ -396,10 +405,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="flex items-center space-x-2 shrink-0 w-full sm:w-auto">
           <button
-            onClick={() => onNavigateTab('compounding')}
-            className="flex-1 sm:flex-initial text-center rounded-lg bg-blue-600/20 border border-blue-500/40 px-3 sm:px-3.5 py-2 text-[11px] sm:text-xs font-tech font-bold uppercase tracking-wider text-blue-300 hover:bg-blue-600/30 transition-colors whitespace-nowrap"
+            onClick={() => onNavigateTab('risk')}
+            className="flex-1 sm:flex-initial text-center rounded-lg bg-blue-600/20 border border-blue-500/40 px-3 sm:px-3.5 py-2 text-[11px] sm:text-xs font-tech font-bold uppercase tracking-wider text-blue-300 hover:bg-blue-600/30 transition-colors whitespace-nowrap flex items-center justify-center space-x-1"
           >
-            $10 Wealth Roadmap →
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Risk Blueprint →</span>
+          </button>
+          <button
+            onClick={() => onNavigateTab('compounding')}
+            className="flex-1 sm:flex-initial text-center rounded-lg bg-[#141418] border border-[#2E2E33] px-3 sm:px-3.5 py-2 text-[11px] sm:text-xs font-tech font-bold uppercase tracking-wider text-zinc-300 hover:text-white hover:border-blue-500/50 transition-colors whitespace-nowrap"
+          >
+            $10 Roadmap
           </button>
           <button
             onClick={() => onNavigateTab('brokers')}

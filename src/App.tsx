@@ -33,6 +33,7 @@ import {
   Order,
   PortfolioSummary,
   Position,
+  RiskProfileType,
   RiskSettings,
   StrategyConfig,
   TradeHistoryItem,
@@ -393,6 +394,22 @@ function QuantaraApp() {
     return res;
   };
 
+  const handleSelectRiskProfile = async (profileId: RiskProfileType) => {
+    const res = await api.setRiskProfile(profileId);
+    if (res?.riskSettings) {
+      setRiskSettings(res.riskSettings);
+      if (user?.uid) {
+        firestoreSync.saveRiskSettings(user.uid, res.riskSettings).catch(console.warn);
+        firestoreSync.appendAuditLog(user.uid, {
+          action: 'SET_RISK_PROFILE',
+          category: 'RISK',
+          details: { profileId },
+        }).catch(console.warn);
+      }
+    }
+    return res;
+  };
+
   const handleConnectBroker = async (payload: any) => {
     const res = await api.connectBroker(payload);
     if (user?.uid && res?.account) {
@@ -685,6 +702,7 @@ function QuantaraApp() {
             riskSettings={riskSettings}
             portfolio={portfolio}
             onUpdateRiskSettings={handleUpdateRiskSettings}
+            onSelectRiskProfile={handleSelectRiskProfile}
             onTriggerKillSwitch={handleTriggerKillSwitch}
             onResetKillSwitch={handleTriggerKillSwitch}
           />

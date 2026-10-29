@@ -100,6 +100,58 @@ export class RiskManagementEngine {
       };
     }
 
+    // 5b. Hard Capital Floor Protection Check
+    if (settings.hardCapitalFloorPercent && portfolio.peakEquity > 0) {
+      const minEquityFloor = (portfolio.peakEquity * settings.hardCapitalFloorPercent) / 100;
+      if (portfolio.totalEquity < minEquityFloor) {
+        return {
+          passed: false,
+          rejectionReason: `Trade rejected: Hard Capital Floor Guarantee triggered (Equity $${portfolio.totalEquity.toFixed(2)} < floor $${minEquityFloor.toFixed(2)}). Capital preserved.`,
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+    }
+
+    // 5c. High-Impact Economic News Blackout Window
+    if (settings.newsBlackoutActive) {
+      return {
+        passed: false,
+        rejectionReason: `Trade rejected: News blackout window active (${settings.newsBlackoutEventName || 'High-Impact Economic Release'}). Orders paused to prevent extreme slippage & spread widening.`,
+        calculatedLotSize: 0,
+        calculatedPositionSizeUsd: 0,
+        calculatedQuantity: 0,
+        stopLossPrice: 0,
+        takeProfitPrice: 0,
+        riskAmountUsd: 0,
+        leverageUsed: 0,
+      };
+    }
+
+    // 5d. Currency / Asset Correlation Filter
+    const isUsdPair = (s: string) => s.toUpperCase().includes('USD');
+    if (isUsdPair(signal.assetSymbol)) {
+      const openUsdPairs = openPositions.filter((p) => isUsdPair(p.symbol));
+      if (openUsdPairs.length >= (settings.maxOpenPositions <= 2 ? 1 : 2)) {
+        return {
+          passed: false,
+          rejectionReason: `Trade rejected: Correlation shield active (${openUsdPairs.length} USD pair(s) already open). Prevents dangerous multi-pair USD exposure.`,
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+    }
+
     // 6. Dynamic Position Sizing (Strict Institutional Lot Sizing strictly bounded 0.01 to 0.10 based on equity)
     const entry = signal.entryPrice;
     const stopLoss = signal.suggestedStopLoss;

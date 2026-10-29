@@ -128,6 +128,31 @@ export interface StrategyConfig {
   };
 }
 
+export type RiskProfileType = 'CONSERVATIVE' | 'BALANCED' | 'MICRO_COMPOUNDING';
+
+export interface RiskProfileDetails {
+  id: RiskProfileType;
+  name: string;
+  badge: string;
+  tagline: string;
+  recommendedAccountSize: string;
+  maxRiskPerTradePercent: number;
+  maxDailyLossPercent: number;
+  minRiskRewardRatio: number;
+  maxOpenPositions: number;
+  breakevenTriggerR: number;
+  partialTakeProfitR: number;
+  newsBlackoutMinutes: number;
+  defaultStopLossAtrMultiplier: number;
+  trailingStopPercent: number;
+  hardCapitalFloorPercent: number;
+  description: string;
+  targetUser: string;
+  mathematicalSafetyProof: string;
+  keyBenefits: string[];
+  safetyGuards: string[];
+}
+
 export interface RiskSettings {
   maxRiskPerTradePercent: number; // e.g. 1.0%
   maxDailyLossPercent: number; // e.g. 3.0%
@@ -144,6 +169,17 @@ export interface RiskSettings {
   killSwitchActive: boolean;
   killSwitchTriggerReason?: string;
   closePositionsOnKillSwitch: boolean;
+  
+  // Institutional Risk Profiles & Advanced Zero-Ruin Guardrails
+  activeRiskProfile?: RiskProfileType;
+  breakevenTriggerR?: number; // e.g. +1.0R auto-moves stop loss to entry
+  partialTakeProfitR?: number; // e.g. +1.8R locks 50% profit
+  partialTakeProfitPercent?: number; // e.g. 50% lot
+  newsBlackoutActive?: boolean;
+  newsBlackoutMinutes?: number; // e.g. 15 mins before/after
+  newsBlackoutEventName?: string;
+  hardCapitalFloorPercent?: number; // e.g. 85% of peak equity
+  minRiskRewardRatio?: number; // e.g. 2.5
 }
 
 export interface TradingSignal {
@@ -201,6 +237,10 @@ export interface Position {
   ticketNumber?: number;
   brokerFillPrice?: number;
   brokerExecutionStatus?: 'PENDING_TERMINAL' | 'FILLED_ON_MT5' | 'SIMULATED';
+  breakevenLocked?: boolean;
+  partialProfitTaken?: boolean;
+  initialLotSize?: number;
+  initialStopLossDistance?: number;
 }
 
 export interface Order {
