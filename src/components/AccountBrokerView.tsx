@@ -341,14 +341,14 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   // MT5 Login Form State
   const [selectedPreset, setSelectedPreset] = useState<BrokerPreset>(BROKER_PRESETS[0]);
   const [customAccountName, setCustomAccountName] = useState('');
-  const [server, setServer] = useState('Exness-MT5Trial9');
+  const [server, setServer] = useState('Exness-MT5Real');
   const [customServer, setCustomServer] = useState('');
   const [serverSearch, setServerSearch] = useState('');
-  const [serverCategory, setServerCategory] = useState<'ALL' | 'TRIAL' | 'REAL'>('ALL');
+  const [serverCategory, setServerCategory] = useState<'ALL' | 'TRIAL' | 'REAL'>('REAL');
   const [isCustomServerMode, setIsCustomServerMode] = useState(false);
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
-  const [accountType, setAccountType] = useState<'REAL' | 'DEMO'>('DEMO');
+  const [accountType, setAccountType] = useState<'REAL' | 'DEMO'>('REAL');
   const [leverage, setLeverage] = useState('1:500');
   const [currency, setCurrency] = useState('USD');
   const [balance, setBalance] = useState<number>(1000);

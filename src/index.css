@@ -504,37 +504,117 @@ html.light textarea::placeholder {
   color: #94A3B8 !important;
 }
 
-/* 11. Gradients & Ambient Glow Refinements */
-html.light .from-\[\#0A0D14\] {
-  --tw-gradient-from: #FFFFFF var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+/* Permanent Deep-Dark Trading Cockpit Blocks (Never Light / Never Washed Out) */
+.trading-cockpit-card,
+html.light .trading-cockpit-card,
+html[data-theme="light"] .trading-cockpit-card,
+body.light .trading-cockpit-card {
+  background-color: #0A0D14 !important;
+  background-image: linear-gradient(135deg, #0A0D14 0%, #101420 50%, #080A0F 100%) !important;
+  border-color: #1F2638 !important;
+  color: #F1F5F9 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
 }
 
-html.light .from-\[\#0C1427\],
-html.light .from-blue-950\/20 {
-  --tw-gradient-from: #EFF6FF var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: #F8FAFC var(--tw-gradient-to-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+.trading-cockpit-card h1,
+.trading-cockpit-card h2,
+.trading-cockpit-card h3,
+.trading-cockpit-card h4,
+html.light .trading-cockpit-card h1,
+html.light .trading-cockpit-card h2,
+html.light .trading-cockpit-card h3,
+html.light .trading-cockpit-card h4,
+html.light .trading-cockpit-card span.text-white,
+html.light .trading-cockpit-card div.text-white,
+html.light .trading-cockpit-card strong.text-white {
+  color: #FFFFFF !important;
 }
 
-/* Landing Page Hero Gradient Text */
-html.light .from-blue-400.via-cyan-300.to-emerald-400 {
-  background-image: linear-gradient(to right, #1D4ED8, #0284C7, #059669) !important;
+.trading-cockpit-card p,
+html.light .trading-cockpit-card p,
+html.light .trading-cockpit-card .text-\[\#8E9299\] {
+  color: #94A3B8 !important;
 }
 
-/* Ambient glow blobs in landing page */
-html.light .bg-gradient-to-tr.from-blue-600\/15.via-cyan-500\/10.to-indigo-600\/10 {
-  opacity: 0.25 !important;
+html.light .trading-cockpit-card .text-blue-300,
+html.light .trading-cockpit-card span.text-blue-300 {
+  color: #93C5FD !important;
 }
 
-/* Dark banner cards to light institutional cards */
-html.light .bg-gradient-to-r.from-\[\#0F172A\].via-\[\#141416\].to-\[\#0A0A0C\],
-html.light .bg-gradient-to-r.from-\[\#0C1222\].via-\[\#101826\].to-\[\#0A0E17\],
-html.light .bg-gradient-to-r.from-blue-950\/20.via-\[\#10131C\].to-\[\#0D0E13\],
-html.light .bg-gradient-to-r.from-blue-950\/30.via-\[\#141724\].to-\[\#0F172A\] {
-  background-image: linear-gradient(to right, #EFF6FF, #F8FAFC, #F1F5F9) !important;
-  border-color: #BFDBFE !important;
+html.light .trading-cockpit-card .text-blue-400,
+html.light .trading-cockpit-card span.text-blue-400 {
+  color: #60A5FA !important;
+}
+
+html.light .trading-cockpit-card .bg-blue-950\/60,
+html.light .trading-cockpit-card .bg-blue-950\/20 {
+  background-color: rgba(23, 37, 84, 0.6) !important;
+}
+
+html.light .trading-cockpit-card .bg-blue-500\/10,
+html.light .trading-cockpit-card .bg-blue-500\/15,
+html.light .trading-cockpit-card .bg-blue-500\/20 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #93C5FD !important;
+}
+
+html.light .trading-cockpit-card .bg-\[\#1F1F23\] {
+  background-color: #1F1F23 !important;
+  color: #FFFFFF !important;
+}
+
+.trading-cockpit-card-amber,
+html.light .trading-cockpit-card-amber,
+html[data-theme="light"] .trading-cockpit-card-amber,
+body.light .trading-cockpit-card-amber {
+  background-color: #0F0E0B !important;
+  background-image: linear-gradient(135deg, #120F08 0%, #1A140B 50%, #0D0A05 100%) !important;
+  border-color: #382A14 !important;
+  color: #F1F5F9 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+}
+
+.trading-cockpit-card-amber h1,
+.trading-cockpit-card-amber h2,
+.trading-cockpit-card-amber h3,
+.trading-cockpit-card-amber h4,
+html.light .trading-cockpit-card-amber h1,
+html.light .trading-cockpit-card-amber h2,
+html.light .trading-cockpit-card-amber h3,
+html.light .trading-cockpit-card-amber h4,
+html.light .trading-cockpit-card-amber span.text-white,
+html.light .trading-cockpit-card-amber div.text-white {
+  color: #FFFFFF !important;
+}
+
+.trading-cockpit-card-amber p,
+html.light .trading-cockpit-card-amber p,
+html.light .trading-cockpit-card-amber .text-\[\#8E9299\] {
+  color: #94A3B8 !important;
+}
+
+html.light .trading-cockpit-card-amber .text-amber-300,
+html.light .trading-cockpit-card-amber span.text-amber-300 {
+  color: #FCD34D !important;
+}
+
+html.light .trading-cockpit-card-amber .text-amber-400,
+html.light .trading-cockpit-card-amber span.text-amber-400 {
+  color: #FBBF24 !important;
+}
+
+html.light .trading-cockpit-card-amber .bg-amber-950\/60 {
+  background-color: rgba(69, 26, 3, 0.6) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+html.light .trading-cockpit-card-amber .bg-amber-500\/10,
+html.light .trading-cockpit-card-amber .bg-amber-500\/15,
+html.light .trading-cockpit-card-amber .bg-amber-500\/20 {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #FCD34D !important;
 }
 
 /* Depth Ladder Row Hovers */

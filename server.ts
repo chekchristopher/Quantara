@@ -932,12 +932,21 @@ app.post('/api/brokers/server/run-all', (req, res) => {
   res.json({ success: true, botState: db.botState, brokerAccounts: db.brokerAccounts });
 });
 
+app.post('/api/brokers/purge-mock-data', (req, res) => {
+  db.purgeMockData();
+  tradingEngine.broadcastState();
+  res.json({ success: true, message: 'All mock and demo data successfully purged.', brokerAccounts: db.brokerAccounts, botState: db.botState });
+});
+
 app.post('/api/brokers/sync', (req, res) => {
   const { accounts } = req.body;
   if (Array.isArray(accounts) && accounts.length > 0) {
     let addedCount = 0;
     for (const incoming of accounts) {
       if (!incoming || !incoming.accountNumber) continue;
+      // Permanently reject legacy 'chek demo' or mock account IDs
+      if (incoming.name === 'chek demo' || incoming.id === 'acc_mt5_1789564204252') continue;
+
       const existing = db.brokerAccounts.find(
         (b) => b.id === incoming.id || (b.accountNumber === incoming.accountNumber && b.server === incoming.server)
       );
@@ -1032,9 +1041,24 @@ app.get('/api/bridge/status', (req, res) => {
   res.json({ success: true, ...realBrokerBridge.getStatus() });
 });
 
+app.get('/api/bridge/verify-license', (req, res) => {
+  const token = String(req.query.token || '');
+  const accountNumber = String(req.query.account || req.query.accountNumber || '');
+  const authResult = realBrokerBridge.verifyLicenseAndAccount(token, accountNumber);
+  if (!authResult.authorized) {
+    return res.status(403).json({ success: false, ...authResult });
+  }
+  res.json({ success: true, ...authResult });
+});
+
 app.get('/api/bridge/pending', (req, res) => {
   const token = String(req.query.token || '');
-  const orders = realBrokerBridge.getPendingOrdersForToken(token);
+  const accountNumber = String(req.query.account || req.query.accountNumber || '');
+  const authResult = realBrokerBridge.verifyLicenseAndAccount(token, accountNumber);
+  if (!authResult.authorized) {
+    return res.status(403).json({ success: false, ...authResult });
+  }
+  const orders = realBrokerBridge.getPendingOrdersForToken(token, accountNumber);
   res.json({ success: true, count: orders.length, orders });
 });
 

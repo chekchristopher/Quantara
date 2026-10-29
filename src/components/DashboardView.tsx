@@ -215,7 +215,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Operator Curriculum & Workbook Banner */}
-      <div className="rounded-xl border border-blue-500/25 bg-gradient-to-r from-blue-950/20 via-[#10131C] to-[#0D0E13] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+      <div className="trading-cockpit-card rounded-xl border border-blue-500/25 bg-[#0A0D14] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center space-x-3">
           <div className="h-9 w-9 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0">
             <BookOpen className="h-4 w-4 text-blue-400" />
@@ -247,25 +247,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Broker Connection & Testing Guidance Hero */}
+      {/* Broker Connection & Testing Guidance Hero */}
       {!activeBroker ? (
-        <div className="rounded-xl border border-blue-500/40 bg-gradient-to-r from-[#0C1427] via-[#101826] to-[#0A0E17] p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+        <div className="trading-cockpit-card rounded-xl border border-blue-500/30 bg-[#0A0D14] p-4 sm:p-5 shadow-2xl relative overflow-hidden">
           <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
           <div className="relative z-10 space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <span className="inline-flex items-center space-x-1.5 rounded-md bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-mono font-bold text-amber-300 border border-amber-500/30">
-                    <span>AWAITING BROKER CONNECTION</span>
+                  <span className="inline-flex items-center space-x-1.5 rounded-md bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                    <span>LIVE REAL EXECUTION READY</span>
                   </span>
                   <span className="rounded bg-blue-500/15 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-300 border border-blue-500/30">
-                    REAL OR DEMO MT5
+                    REAL BROKER GATEWAY
                   </span>
                 </div>
                 <h2 className="text-sm sm:text-base font-bold text-white font-tech uppercase tracking-wide">
-                  Connect Your Trading Account (Real or Demo)
+                  Connect Your Live Trading Account
                 </h2>
                 <p className="text-xs text-[#8E9299] max-w-2xl leading-relaxed">
-                  Connect your MT5 broker account to start automated algorithmic trade execution. The software directly monitors live ticks, enforces dynamic stop-losses, and manages positions.
+                  Connect your live MT5 broker account to deploy automated institutional trading. Real trades execute directly through your connected terminal bridge and cloud gateway with sub-millisecond precision.
                 </p>
               </div>
 
@@ -273,39 +274,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigateTab('brokers')}
-                  className="rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-mono font-bold text-white transition-all shadow-md flex items-center justify-center space-x-1.5"
+                  className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-mono font-bold text-white transition-all shadow-md flex items-center justify-center space-x-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Connect Demo (Recommended)</span>
+                  <span>Connect Real MT5 Account</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onNavigateTab('brokers')}
                   className="rounded-lg bg-[#1F1F23] hover:bg-[#2A2A30] border border-[#2E2E35] px-3 py-2 text-xs font-mono font-semibold text-zinc-300 hover:text-white transition-all text-center"
                 >
-                  Connect Real
+                  Configure Servers
                 </button>
               </div>
             </div>
 
-            {/* Clear encouragement to test on demo first */}
-            <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 flex items-start space-x-3 text-xs">
-              <Shield className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+            {/* Real Trading Notice */}
+            <div className="rounded-lg border border-emerald-500/30 bg-[#08120D] p-3 flex items-start space-x-3 text-xs">
+              <Shield className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <span className="font-semibold text-amber-200">
-                  Recommended Proving Workflow: Test on Demo First
+                <span className="font-semibold text-emerald-200">
+                  Real Capital &amp; Live Broker Execution Mode
                 </span>
                 <p className="text-[#8E9299] leading-relaxed">
-                  We encourage you to connect a <strong className="text-white">broker Demo account</strong> (e.g. <em>Exness-MT5Trial9</em>) before connecting your real funds. This allows you to evaluate automated execution speed, verify entry precision, and confirm profitability with <strong className="text-amber-300">zero risk to real funds</strong>.
+                  All mock records and simulations have been purged. When you connect your live MT5 broker account (e.g. <em>Exness-MT5Real</em>), orders are dispatched to live market order books with real funds.
                 </p>
               </div>
             </div>
           </div>
         </div>
       ) : isDemoActive ? (
-        <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-950/25 via-[#141416] to-[#0E0E11] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+        <div className="trading-cockpit-card-amber rounded-xl border border-amber-500/40 bg-[#0F0E0B] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
           <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+            <div className="h-9 w-9 rounded-lg bg-amber-950/60 border border-amber-500/40 flex items-center justify-center shrink-0">
               <FlaskConical className="h-4 w-4 text-amber-400" />
             </div>
             <div>
@@ -332,9 +333,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/25 via-[#101915] to-[#0E0E11] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+        <div className="trading-cockpit-card rounded-xl border border-emerald-500/40 bg-[#08120D] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
           <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <div className="h-9 w-9 rounded-lg bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center shrink-0">
               <ShieldCheck className="h-4 w-4 text-emerald-400" />
             </div>
             <div>
@@ -363,9 +364,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* Micro-Wealth Accelerator & Autonomous Takeover Banner */}
-      <div className="rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-950/40 via-[#141416] to-[#0E0E11] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shadow-blue-500/5">
+      <div className="trading-cockpit-card rounded-xl border border-blue-500/30 bg-[#0A0D14] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl shadow-black/50">
         <div className="flex items-start sm:items-center space-x-3 sm:space-x-3.5">
-          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-blue-950/60 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
             <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
           </div>
           <div>

@@ -324,6 +324,24 @@ export const RealBrokerBridgeView: React.FC<RealBrokerBridgeViewProps> = ({
               To route trades from this Quantara AI engine straight into your real Exness or broker MT5 terminal, attach our lightweight Expert Advisor. It communicates securely with this server via MT5's native <code className="text-amber-300 font-mono">WebRequest()</code> and executes orders at market with native <code className="text-emerald-300 font-mono">OrderSend()</code>.
             </p>
 
+            {/* Registered License & Account Lock Status */}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-tech">
+                    Registered User Security Gate
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  WHITELIST ENFORCED
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-relaxed">
+                Only your registered MT5 Account <strong className="text-white">#{targetAccount?.accountNumber || 'Primary'}</strong> is whitelisted to poll and execute trades. If an unregistered user or different terminal attempts to run this EA, the server immediately denies access (HTTP 403) and MT5 triggers self-termination via <code className="text-emerald-300 font-mono">ExpertRemove()</code>.
+              </p>
+            </div>
+
             {/* Credentials to Copy */}
             <div className="space-y-3 pt-2">
               {/* WebRequest URL */}

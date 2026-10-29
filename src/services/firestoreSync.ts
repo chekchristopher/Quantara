@@ -53,9 +53,46 @@ export const firestoreSync = {
     const userDocRef = doc(db, 'users', user.uid);
     const path = `users/${user.uid}`;
     try {
-      const snap = await getDoc(userDocRef);
+      let snap: any = null;
+      try {
+        snap = await getDoc(userDocRef);
+      } catch (readErr: any) {
+        const isOffline =
+          readErr instanceof Error &&
+          (readErr.message.includes('client is offline') ||
+            readErr.message.includes('offline') ||
+            (readErr as any).code === 'unavailable');
+
+        if (isOffline) {
+          console.warn('Firestore offline during syncUserProfile; operating in local cache mode.');
+          const isDefaultAdmin = user.email === 'chekchris85@gmail.com';
+          const cachedRaw = localStorage.getItem('quantara_custom_profile');
+          let cachedProfile: Partial<UserProfileDoc> = {};
+          if (cachedRaw) {
+            try {
+              cachedProfile = JSON.parse(cachedRaw);
+            } catch {}
+          }
+          const offlineProfile: UserProfileDoc = {
+            id: user.uid,
+            email: user.email || 'chekchris85@gmail.com',
+            displayName: cachedProfile.displayName || user.displayName || user.email?.split('@')[0] || 'Chris Chek',
+            photoURL: cachedProfile.photoURL || user.photoURL || '',
+            role: isDefaultAdmin ? 'admin' : (cachedProfile.role || 'operator'),
+            enterpriseTier: isDefaultAdmin ? 'Enterprise Dedicated' : (cachedProfile.enterpriseTier || 'Standard'),
+            emailVerified: user.emailVerified,
+            createdAt: cachedProfile.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          // setDoc with merge will queue locally in offline persistence without error
+          setDoc(userDocRef, offlineProfile, { merge: true }).catch(() => {});
+          return offlineProfile;
+        }
+        throw readErr;
+      }
+
       const now = new Date().toISOString();
-      if (snap.exists()) {
+      if (snap && snap.exists()) {
         const existingData = snap.data() as UserProfileDoc;
         const updatedData: Partial<UserProfileDoc> = {
           displayName: existingData.displayName || user.displayName || user.email?.split('@')[0] || 'Enterprise Operator',
@@ -82,6 +119,22 @@ export const firestoreSync = {
         return newProfile;
       }
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('client is offline')) {
+        console.warn('Firestore offline notice during profile sync:', errMsg);
+        const isDefaultAdmin = user.email === 'chekchris85@gmail.com';
+        return {
+          id: user.uid,
+          email: user.email || 'chekchris85@gmail.com',
+          displayName: user.displayName || 'Chris Chek',
+          photoURL: user.photoURL || '',
+          role: isDefaultAdmin ? 'admin' : 'operator',
+          enterpriseTier: isDefaultAdmin ? 'Enterprise Dedicated' : 'Standard',
+          emailVerified: user.emailVerified,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
       handleFirestoreError(error, OperationType.WRITE, path);
     }
   },
@@ -94,7 +147,25 @@ export const firestoreSync = {
     const userDocRef = doc(db, 'users', userId);
     const path = `users/${userId}`;
     try {
-      const snap = await getDoc(userDocRef);
+      let snap: any = null;
+      try {
+        snap = await getDoc(userDocRef);
+      } catch (readErr: any) {
+        const isOffline =
+          readErr instanceof Error &&
+          (readErr.message.includes('client is offline') ||
+            readErr.message.includes('offline') ||
+            (readErr as any).code === 'unavailable');
+        if (isOffline) {
+          console.warn('Firestore offline during updateUserProfileData; queuing update.');
+          const now = new Date().toISOString();
+          const updates: any = { updatedAt: now, ...data };
+          setDoc(userDocRef, updates, { merge: true }).catch(() => {});
+          return updates as UserProfileDoc;
+        }
+        throw readErr;
+      }
+
       const now = new Date().toISOString();
       const updates: any = {
         updatedAt: now,
@@ -105,7 +176,7 @@ export const firestoreSync = {
       if (data.bio !== undefined) updates.bio = data.bio;
       if (data.desk !== undefined) updates.desk = data.desk;
 
-      if (snap.exists()) {
+      if (snap && snap.exists()) {
         await updateDoc(userDocRef, updates);
         return { ...(snap.data() as UserProfileDoc), ...updates };
       } else {
@@ -277,6 +348,12 @@ export const firestoreSync = {
         const brokers: BrokerAccount[] = [];
         snap.forEach((docSnap) => {
           const d = docSnap.data();
+          // Permanently scrub legacy 'chek demo' or mock account from Firestore
+          if (d.name === 'chek demo' || d.id === 'acc_mt5_1789564204252') {
+            deleteDoc(docSnap.ref).catch(console.warn);
+            return;
+          }
+
           brokers.push({
             id: d.id,
             name: d.name || d.broker || 'Broker Account',
@@ -289,7 +366,7 @@ export const firestoreSync = {
             isSecuredInFirebase: d.isSecuredInFirebase !== false,
             lastCloudSyncTimestamp: d.lastCloudSyncTimestamp || Date.now(),
             accountNumber: d.accountNumber,
-            accountType: d.accountType || 'DEMO',
+            accountType: d.accountType || 'REAL',
             currency: d.currency || 'USD',
             leverage: String(d.leverage || '1:500'),
             apiKeyMasked: d.apiKeyMasked || '••••••••',
@@ -300,7 +377,7 @@ export const firestoreSync = {
             freeMargin: d.freeMargin ?? 0,
             marginLevel: d.marginLevel ?? 999.9,
             pingMs: d.pingMs ?? 14,
-            isPaper: d.isPaper ?? true,
+            isPaper: d.isPaper ?? false,
             lastConnected: d.lastConnected || Date.now(),
             serverStatus: d.serverStatus || 'RUNNING',
             isNonStop: d.isNonStop !== false,
@@ -371,6 +448,11 @@ export const firestoreSync = {
         const trades: TradeHistoryItem[] = [];
         snap.forEach((docSnap) => {
           const d = docSnap.data();
+          if (d.serverName === 'chek demo' || d.accountName === 'chek demo' || d.serverId === 'acc_mt5_1789564204252') {
+            deleteDoc(docSnap.ref).catch(console.warn);
+            return;
+          }
+
           trades.push({
             id: d.id,
             symbol: d.symbol,

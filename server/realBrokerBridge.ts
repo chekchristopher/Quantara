@@ -76,6 +76,53 @@ export class RealBrokerBridge {
   }
 
   /**
+   * Verifies if a connecting MT5 terminal is licensed and matches a registered account whitelist.
+   */
+  public verifyLicenseAndAccount(token: string, accountNumber?: string): {
+    authorized: boolean;
+    reason?: string;
+    accountName?: string;
+    broker?: string;
+    registeredAccount?: string;
+    licenseTier?: string;
+    userEmail?: string;
+  } {
+    if (!token || token.trim() === '') {
+      return { authorized: false, reason: 'LICENSE_TOKEN_REQUIRED' };
+    }
+    const cleanToken = token.trim();
+    const account = this.getAccountByToken(cleanToken);
+    if (!account) {
+      return {
+        authorized: false,
+        reason: 'UNREGISTERED_LICENSE_TOKEN',
+      };
+    }
+
+    // Strict MT5 Account Whitelist Match
+    if (accountNumber && accountNumber.trim() !== '') {
+      const cleanReqAcct = accountNumber.trim();
+      const cleanRegisteredAcct = String(account.accountNumber).trim();
+      if (cleanReqAcct !== cleanRegisteredAcct) {
+        return {
+          authorized: false,
+          reason: 'ACCOUNT_NUMBER_UNREGISTERED',
+          registeredAccount: cleanRegisteredAcct,
+        };
+      }
+    }
+
+    return {
+      authorized: true,
+      accountName: account.name,
+      broker: account.broker,
+      registeredAccount: account.accountNumber,
+      licenseTier: 'Enterprise Institutional Pro',
+      userEmail: db.user?.email || 'chekchris85@gmail.com',
+    };
+  }
+
+  /**
    * Enqueues a real market order to be placed on the broker terminal or cloud API.
    */
   public async dispatchRealOrder(params: {
@@ -206,16 +253,19 @@ export class RealBrokerBridge {
   }
 
   /**
-   * Pulls pending orders for an EA connecting with a specific token.
+   * Pulls pending orders for an EA connecting with a specific token and account number.
    */
-  public getPendingOrdersForToken(token: string): PendingBridgeOrder[] {
+  public getPendingOrdersForToken(token: string, accountNumber?: string): PendingBridgeOrder[] {
+    const auth = this.verifyLicenseAndAccount(token, accountNumber);
+    if (!auth.authorized) {
+      return [];
+    }
+
     const now = Date.now();
     const validOrders = this.pendingQueue.filter((p) => p.expiresAt > now);
-
     const account = this.getAccountByToken(token);
     if (!account) {
-      // If default or matching any valid account token
-      return validOrders;
+      return [];
     }
 
     return validOrders.filter((p) => !p.accountNumber || p.accountNumber === account.accountNumber);
@@ -578,16 +628,69 @@ datetime g_lastSyncTime = 0;
 string   g_accountNumberStr = "${accountNumber}";
 
 //+------------------------------------------------------------------+
+//| Verify license and account whitelisting with Quantara Cloud Gate |
+//+------------------------------------------------------------------+
+bool VerifyQuantaraLicense()
+{
+   string currentLogin = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string url = InpBridgeBaseUrl + "/verify-license?token=" + InpBridgeToken + "&account=" + currentLogin;
+   string headers = "Content-Type: application/json\\r\\nAccept: application/json";
+   char postData[];
+   char resultData[];
+   string resultHeaders;
+
+   ResetLastError();
+   int res = WebRequest("GET", url, headers, 4000, postData, resultData, resultHeaders);
+   if(res == 200)
+   {
+      string responseText = CharArrayToString(resultData);
+      if(StringFind(responseText, "\\"authorized\\":true") >= 0)
+      {
+         return true;
+      }
+      Print("❌ Server returned non-authorized response: ", responseText);
+      return false;
+   }
+   else if(res == 401 || res == 403)
+   {
+      PrintFormat("❌ Access Denied (HTTP %d): Account #%s is not whitelisted in Quantara.", res, currentLogin);
+      return false;
+   }
+   else if(res == -1)
+   {
+      int err = GetLastError();
+      if(err == 4014)
+      {
+         Alert("❌ MT5 ERROR 4014: URL not allowed!\\n\\nOpen MT5 -> Tools -> Options -> Expert Advisors -> check 'Allow WebRequest for listed URL:' and add:\\n" + "${cleanUrl}");
+      }
+      return false;
+   }
+   return false;
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   string currentLogin = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
    Print("------------------------------------------------------------------");
    Print("🚀 Starting Quantara MT5 Real Execution Bridge...");
    Print("📡 Target Bridge URL: ", InpBridgeBaseUrl);
    Print("🔑 Account Token: ", InpBridgeToken);
-   Print("🏢 Broker: ${brokerName} | Account: #", AccountInfoInteger(ACCOUNT_LOGIN));
+   Print("🏢 Broker: ${brokerName} | Account: #", currentLogin);
    Print("------------------------------------------------------------------");
+
+   // 1. Mandatory Server-Side License & Whitelist Handshake
+   Print("🔐 Validating Quantara License with Cloud Gateway...");
+   if(!VerifyQuantaraLicense())
+   {
+      Alert("❌ QUANTARA ACCESS DENIED:\\n\\nMT5 Account #" + currentLogin + " is NOT registered to an active Quantara license.\\n\\nUnauthorized terminals are barred from receiving orders.\\nUnloading EA from chart.");
+      Print("❌ Security Gate: Terminating EA. Account #" + currentLogin + " is unauthorized.");
+      ExpertRemove();
+      return(INIT_FAILED);
+   }
+   Print("✅ Quantara License Verified: Account #" + currentLogin + " is authorized for automated execution.");
 
    // Configure CTrade
    m_trade.SetExpertMagicNumber(InpMagicNumber);
@@ -639,7 +742,8 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void PollAndExecutePendingOrders()
 {
-   string url = InpBridgeBaseUrl + "/pending?token=" + InpBridgeToken;
+   string currentLogin = IntegerToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string url = InpBridgeBaseUrl + "/pending?token=" + InpBridgeToken + "&account=" + currentLogin;
    string headers = "Content-Type: application/json\\r\\nAccept: application/json";
    char   postData[];
    char   resultData[];
@@ -655,6 +759,18 @@ void PollAndExecutePendingOrders()
       {
          ParseAndProcessOrderJson(responseText);
       }
+   }
+   else if(res == 401 || res == 403)
+   {
+      static bool s_alertedRevocation = false;
+      if(!s_alertedRevocation)
+      {
+         Alert("❌ QUANTARA LICENSE REVOKED: This MT5 terminal is no longer authorized. Unloading EA from chart.");
+         s_alertedRevocation = true;
+      }
+      Print("❌ Unauthorized poll response (HTTP " + IntegerToString(res) + "). Terminating EA via ExpertRemove.");
+      ExpertRemove();
+      return;
    }
    else if(res == -1)
    {

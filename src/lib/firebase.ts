@@ -14,6 +14,9 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  setLogLevel,
   doc,
   getDoc,
   getDocFromServer,
@@ -30,14 +33,18 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Silence non-fatal WebChannel background polling warnings
+setLogLevel('silent');
+
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Initialize Firestore with experimentalForceLongPolling to avoid 10-second WebChannel streaming timeouts in proxy/iframe environments
+// CRITICAL: Initialize Firestore with auto-detect long polling and persistent local cache for high-resilience streaming & offline capabilities
 export const db = initializeFirestore(
   app,
   {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   },
   firebaseConfig.firestoreDatabaseId
 );
@@ -79,8 +86,10 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const isOffline = errMsg.includes('client is offline') || errMsg.includes('offline');
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid || null,
       email: auth.currentUser?.email || null,
@@ -95,21 +104,23 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error:', JSON.stringify(errInfo));
+  if (isOffline) {
+    console.warn('Firestore offline notice (operations persist in local cache):', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error:', JSON.stringify(errInfo));
+  }
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate Connection to Firestore with quick timeout to avoid 10-second WebChannel timeout warnings
+// Validate Connection to Firestore (Skill standard probe)
 export async function testConnection(): Promise<boolean> {
   try {
-    const probePromise = getDocFromServer(doc(db, 'test', 'connection'));
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('connection probe timeout (offline fallback)')), 3000)
-    );
-    await Promise.race([probePromise, timeoutPromise]);
+    await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
-    // Non-fatal if offline or probe timed out, client seamlessly uses offline cache
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firestore offline notice: Local cache active.');
+    }
     return false;
   }
 }

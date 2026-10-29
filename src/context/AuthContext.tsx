@@ -54,8 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         setCloudSyncStatus('syncing');
         try {
-          // Probe connection
-          await validateFirestoreConnection();
           // Sync profile
           const cached = getCachedProfile();
           const userProf = await firestoreSync.syncUserProfile({

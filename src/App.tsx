@@ -58,7 +58,7 @@ function QuantaraApp() {
     isRunning: false,
     status: 'AWAITING_BROKER_CONNECTION',
     mode: 'fully-automatic',
-    environment: 'paper',
+    environment: 'live',
     activeStrategyId: 'adaptive-regime',
     activeStrategyName: 'Adaptive Regime Meta-Engine',
     selectedAssets: ['XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD'],
@@ -225,26 +225,30 @@ function QuantaraApp() {
 
   // LocalStorage backup for accounts so connected accounts persist locally and sync to server
   useEffect(() => {
-    if (brokerAccounts.length > 0) {
-      try {
-        localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(brokerAccounts));
-      } catch (e) {
-        console.warn('Storage save warning:', e);
-      }
+    try {
+      localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(brokerAccounts));
+    } catch (e) {
+      console.warn('Storage save warning:', e);
     }
   }, [brokerAccounts]);
 
-  // Initial cold-start check: if server has no accounts, hydrate from localStorage
+  // Initial cold-start check: scrub legacy 'chek demo' or mock accounts and hydrate clean real accounts
   useEffect(() => {
     try {
       const saved = localStorage.getItem('quantara_connected_accounts_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          api.syncBrokerAccounts(parsed).then((res) => {
-            if (res?.accounts?.length) setBrokerAccounts(res.accounts);
-            if (res?.botState) setBotState(res.botState);
-          }).catch(console.warn);
+        if (Array.isArray(parsed)) {
+          const cleanAccounts = parsed.filter((a: any) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
+          if (cleanAccounts.length !== parsed.length) {
+            localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(cleanAccounts));
+          }
+          if (cleanAccounts.length > 0) {
+            api.syncBrokerAccounts(cleanAccounts).then((res) => {
+              if (res?.accounts) setBrokerAccounts(res.accounts);
+              if (res?.botState) setBotState(res.botState);
+            }).catch(console.warn);
+          }
         }
       }
     } catch (e) {

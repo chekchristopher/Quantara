@@ -267,30 +267,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right: Quick Action Controls */}
           <div className="flex items-center space-x-1.5 sm:space-x-3">
-            {/* Paper / Live Switcher */}
-            <div className="hidden md:flex items-center rounded-lg border border-[#1F1F23] bg-[#141416] p-0.5">
-              <button
-                onClick={onSwitchToPaper}
-                className={`rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold transition-all ${
-                  botState.environment === 'paper'
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-600/40 shadow-sm'
-                    : 'text-[#8E9299] hover:text-white'
-                }`}
-              >
-                PAPER
-              </button>
-              <button
-                onClick={onRequestLiveMode}
-                className={`rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold transition-all flex items-center space-x-1 ${
-                  botState.environment === 'live'
-                    ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40 shadow-sm'
-                    : 'text-[#8E9299] hover:text-[#EF4444]'
-                }`}
-              >
-                <span>LIVE</span>
-              </button>
-            </div>
-
             {/* Autonomous Takeover Toggle */}
             {onToggleTakeover && (
               <button
@@ -307,42 +283,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-bold">{botState.autonomousTakeover ? 'ON' : 'OFF'}</span>
               </button>
             )}
-
-            {/* Quick Engine Resume/Pause Button */}
-            <button
-              onClick={onToggleBot}
-              className={`hidden sm:flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold transition-all border ${
-                botState.isRunning
-                  ? 'border-[#1F1F23] bg-[#141416] text-[#E4E4E7] hover:bg-[#1F1F23]'
-                  : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
-              }`}
-            >
-              {botState.isRunning ? (
-                <>
-                  <Pause className="h-3.5 w-3.5" />
-                  <span>PAUSE</span>
-                </>
-              ) : (
-                <>
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                  <span>RESUME</span>
-                </>
-              )}
-            </button>
-
-            {/* Emergency Kill Switch */}
-            <button
-              onClick={onTriggerKillSwitch}
-              className={`flex items-center space-x-1 sm:space-x-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all shadow-md ${
-                riskSettings.killSwitchActive
-                  ? 'bg-[#DC2626] text-white animate-bounce ring-2 ring-red-400 shadow-red-900/40'
-                  : 'bg-[#EF4444] hover:bg-[#DC2626] text-white shadow-red-900/20'
-              }`}
-              title="Instant Kill Switch: Halts new executions and locks active positions"
-            >
-              <AlertOctagon className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden xs:inline">{riskSettings.killSwitchActive ? 'LOCKED' : 'STOP'}</span>
-            </button>
 
             {/* Dark / Light Theme Toggle */}
             <ThemeToggle variant="compact" />
@@ -567,46 +507,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {user ? 'Account' : 'Sign In'}
                   </button>
                 )}
-              </div>
-
-              {/* Quick Mode / State Toggles inside Drawer */}
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-                <div className="rounded-lg bg-[#0A0D14] p-2 border border-[#1E2330] flex items-center justify-between">
-                  <span className="text-[10px] text-[#8E9299] uppercase font-bold">Mode</span>
-                  <div className="flex space-x-1">
-                    <button
-                      onClick={onSwitchToPaper}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        botState.environment === 'paper' ? 'bg-blue-600 text-white' : 'text-[#8E9299] hover:text-white'
-                      }`}
-                    >
-                      PAPER
-                    </button>
-                    <button
-                      onClick={onRequestLiveMode}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        botState.environment === 'live' ? 'bg-red-600 text-white' : 'text-[#8E9299] hover:text-white'
-                      }`}
-                    >
-                      LIVE
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-lg bg-[#0A0D14] p-2 border border-[#1E2330] flex items-center justify-between">
-                  <span className="text-[10px] text-[#8E9299] uppercase font-bold">Engine</span>
-                  <button
-                    onClick={onToggleBot}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center space-x-1 ${
-                      botState.isRunning
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                    }`}
-                  >
-                    {botState.isRunning ? <Pause className="h-2.5 w-2.5" /> : <Play className="h-2.5 w-2.5 fill-current" />}
-                    <span>{botState.isRunning ? 'LIVE' : 'PAUSED'}</span>
-                  </button>
-                </div>
               </div>
             </div>
 

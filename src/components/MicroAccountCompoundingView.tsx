@@ -156,7 +156,7 @@ export const MicroAccountCompoundingView: React.FC<MicroAccountCompoundingViewPr
   return (
     <div className="space-y-6">
       {/* Autonomous Takeover Hero Banner */}
-      <div className="rounded-xl border border-blue-500/30 bg-gradient-to-r from-[#0F172A] via-[#141416] to-[#0A0A0C] p-5 shadow-xl relative overflow-hidden">
+      <div className="trading-cockpit-card rounded-xl border border-blue-500/30 bg-[#0A0D14] p-5 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 h-40 w-80 bg-blue-600/10 blur-3xl pointer-events-none rounded-full" />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div className="space-y-2">

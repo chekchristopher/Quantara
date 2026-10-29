@@ -26,8 +26,8 @@ const ENGINE_STATE_FILE = path.join(ACCOUNTS_STORAGE_DIR, 'trading_engine_state.
 export class AppDatabase {
   public user: UserProfile = {
     id: 'usr_institutional_01',
-    email: 'trader@aegistrade.ai',
-    name: 'Alexander Wright',
+    email: 'chekchris85@gmail.com',
+    name: 'Chris Chek',
     role: 'admin',
     twoFactorEnabled: true,
     createdTime: Date.now() - 90 * 24 * 3600 * 1000,
@@ -47,7 +47,7 @@ export class AppDatabase {
     isRunning: false,
     status: 'AWAITING_BROKER_CONNECTION',
     mode: 'fully-automatic',
-    environment: 'paper',
+    environment: 'live',
     activeStrategyId: 'adaptive-regime',
     activeStrategyName: 'Adaptive Regime Meta-Engine',
     selectedAssets: ['XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD'],
@@ -167,7 +167,8 @@ export class AppDatabase {
         const raw = fs.readFileSync(ACCOUNTS_STORAGE_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Permanently ignore and filter out legacy 'chek demo' or mock accounts
+          return parsed.filter((a) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
         }
       }
     } catch (err) {
@@ -226,6 +227,45 @@ export class AppDatabase {
     }
   }
 
+  public purgeMockData(): void {
+    // Scrub all mock and demo artifacts
+    this.brokerAccounts = this.brokerAccounts.filter((a) => a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
+    this.positions = this.positions.filter((p) => p.serverName !== 'chek demo' && p.serverId !== 'acc_mt5_1789564204252');
+    this.orders = this.orders.filter((o) => o.serverName !== 'chek demo' && o.serverId !== 'acc_mt5_1789564204252');
+    this.tradesHistory = this.tradesHistory.filter((t) => t.accountName !== 'chek demo' && t.serverName !== 'chek demo' && t.serverId !== 'acc_mt5_1789564204252');
+
+    if (this.brokerAccounts.length === 0) {
+      this.portfolio = {
+        totalEquity: 0,
+        cashBalance: 0,
+        unrealizedPnl: 0,
+        realizedPnlToday: 0,
+        totalRealizedPnl: 0,
+        todayPnlPercent: 0,
+        totalReturnPercent: 0,
+        maxDrawdownPercent: 0,
+        currentDrawdownPercent: 0,
+        winRatePercent: 0,
+        profitFactor: 0,
+        totalTradesExecuted: 0,
+        activePositionsCount: 0,
+        currentExposureUsd: 0,
+        currentExposurePercent: 0,
+        peakEquity: 0,
+        realizedPnlTodayHistory: [],
+      };
+      this.botState.activeBrokerAccountId = undefined;
+      this.botState.activeBrokerAccountName = undefined;
+      this.botState.isRunning = false;
+      this.botState.status = 'AWAITING_BROKER_CONNECTION';
+      this.botState.serverEngineStatus = 'STOPPED';
+      this.botState.isNonStopLoop = false;
+    }
+    this.offlineSessionStats = undefined;
+    this.persistAccounts();
+    this.persistEngineState();
+  }
+
   private initializeEngineState(): void {
     try {
       if (fs.existsSync(ENGINE_STATE_FILE)) {
@@ -236,23 +276,27 @@ export class AppDatabase {
             this.portfolio = { ...this.portfolio, ...state.portfolio };
           }
           if (Array.isArray(state.positions)) {
-            this.positions = state.positions.map((p: any) => ({
-              ...p,
-              lotSize: typeof p.lotSize === 'number' && p.lotSize > 0
-                ? Math.min(0.10, Math.max(0.01, p.lotSize))
-                : 0.01,
-            }));
+            this.positions = state.positions
+              .filter((p: any) => p.serverName !== 'chek demo' && p.serverId !== 'acc_mt5_1789564204252')
+              .map((p: any) => ({
+                ...p,
+                lotSize: typeof p.lotSize === 'number' && p.lotSize > 0
+                  ? Math.min(0.10, Math.max(0.01, p.lotSize))
+                  : 0.01,
+              }));
           }
           if (Array.isArray(state.orders)) {
-            this.orders = state.orders;
+            this.orders = state.orders.filter((o: any) => o.serverName !== 'chek demo' && o.serverId !== 'acc_mt5_1789564204252');
           }
           if (Array.isArray(state.tradesHistory)) {
-            this.tradesHistory = state.tradesHistory.map((t: any) => ({
-              ...t,
-              lotSize: typeof t.lotSize === 'number' && t.lotSize > 0
-                ? Math.min(0.10, Math.max(0.01, t.lotSize))
-                : 0.01,
-            }));
+            this.tradesHistory = state.tradesHistory
+              .filter((t: any) => t.accountName !== 'chek demo' && t.serverName !== 'chek demo' && t.serverId !== 'acc_mt5_1789564204252')
+              .map((t: any) => ({
+                ...t,
+                lotSize: typeof t.lotSize === 'number' && t.lotSize > 0
+                  ? Math.min(0.10, Math.max(0.01, t.lotSize))
+                  : 0.01,
+              }));
           }
           if (state.offlineSessionStats) {
             this.offlineSessionStats = state.offlineSessionStats;
@@ -263,14 +307,15 @@ export class AppDatabase {
           if (state.botState) {
             // Restore running status if broker account is configured to run
             const activeAcc = this.brokerAccounts.find((a) => a.id === state.botState.activeBrokerAccountId || a.isActiveForTakeover);
-            const isServerAllowed = activeAcc ? activeAcc.serverStatus !== 'STOPPED' : true;
+            const isServerAllowed = activeAcc ? activeAcc.serverStatus !== 'STOPPED' : false;
             this.botState = {
               ...this.botState,
               ...state.botState,
+              environment: 'live',
               isRunning: isServerAllowed && state.botState.isRunning !== false,
-              status: (isServerAllowed && state.botState.isRunning !== false) ? 'ONLINE' : (state.botState.status || 'PAUSED'),
+              status: (isServerAllowed && state.botState.isRunning !== false) ? 'ONLINE' : (state.botState.status || 'AWAITING_BROKER_CONNECTION'),
               serverEngineStatus: (isServerAllowed && state.botState.isRunning !== false) ? 'RUNNING' : (state.botState.serverEngineStatus || 'STOPPED'),
-              isNonStopLoop: true,
+              isNonStopLoop: isServerAllowed,
             };
           }
         }
@@ -340,6 +385,15 @@ export class AppDatabase {
           'info'
         );
       }
+    } else {
+      this.brokerAccounts = [];
+      this.botState.activeBrokerAccountId = undefined;
+      this.botState.activeBrokerAccountName = undefined;
+      this.botState.environment = 'live';
+      this.botState.isRunning = false;
+      this.botState.status = 'AWAITING_BROKER_CONNECTION';
+      this.botState.serverEngineStatus = 'STOPPED';
+      this.botState.isNonStopLoop = false;
     }
   }
 
@@ -356,8 +410,8 @@ export class AppDatabase {
       id: 'notif_welcome',
       timestamp: Date.now(),
       type: 'SYSTEM',
-      title: 'Connect Your MT5 Trading Account',
-      message: 'Quantara autonomous trading engine is ready. Connect your broker account to begin. We strongly encourage connecting your Demo account (e.g. Exness-MT5Trial9) first for risk-free testing before connecting real funds.',
+      title: 'Real MT5 Trading Engine Ready',
+      message: 'Quantara institutional trading engine is active in Live real execution mode. Connect your real broker account to begin automated execution.',
       severity: 'info',
       read: false,
     },
