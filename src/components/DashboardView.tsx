@@ -16,6 +16,7 @@ import {
   FlaskConical,
   Globe,
   HelpCircle,
+  Lock,
   Maximize2,
   MinusCircle,
   Percent,
@@ -30,6 +31,7 @@ import {
   Wifi,
   XCircle,
   Zap,
+  FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -50,6 +52,7 @@ import {
   Order,
   PortfolioSummary,
   Position,
+  RiskProfileType,
   RiskSettings,
   TradeHistoryItem,
   TradingMode,
@@ -57,6 +60,8 @@ import {
 import { formatPositionLotSize, calculateEquityLotSize } from '../utils/lotSize';
 import { OrderBookDepthVisualizer } from './OrderBookDepthVisualizer';
 import { SessionPnlChart } from './SessionPnlChart';
+import { QuickLaunchWizard } from './QuickLaunchWizard';
+import { EngineActivityStream } from './EngineActivityStream';
 import { useTheme } from '../context/ThemeContext';
 
 interface DashboardViewProps {
@@ -74,6 +79,9 @@ interface DashboardViewProps {
   onPlaceManualOrder: (order: { symbol: string; side: 'LONG' | 'SHORT'; quantity: number; stopLoss?: number; takeProfit?: number }) => void;
   onOpenExplanationModal: (tradeOrSignalId: string, customData?: any) => void;
   onNavigateTab: (tab: string) => void;
+  onSelectRiskProfile?: (profile: RiskProfileType) => void;
+  onToggleAutonomousTakeover?: () => void;
+  onOpenStatementModal?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -91,6 +99,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onPlaceManualOrder,
   onOpenExplanationModal,
   onNavigateTab,
+  onSelectRiskProfile,
+  onToggleAutonomousTakeover,
+  onOpenStatementModal,
 }) => {
   const { isDark } = useTheme();
   const [selectedSymbol, setSelectedSymbol] = useState<string>('XAU/USD');
@@ -363,6 +374,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
+      {/* 0. GUIDED 3-STEP QUICK-LAUNCH WIZARD FOR NEW USERS */}
+      <QuickLaunchWizard
+        botState={botState}
+        riskSettings={riskSettings}
+        brokerAccounts={brokerAccounts}
+        onSelectRiskProfile={(profile) => onSelectRiskProfile?.(profile)}
+        onNavigateTab={onNavigateTab}
+        onToggleAutonomousTakeover={onToggleAutonomousTakeover}
+      />
+
       {/* Micro-Wealth Accelerator & Autonomous Takeover Banner */}
       <div className="trading-cockpit-card rounded-xl border border-blue-500/30 bg-[#0A0D14] p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl shadow-black/50">
         <div className="flex items-start sm:items-center space-x-3 sm:space-x-3.5">
@@ -562,6 +583,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* LIVE ENGINE SCANNER & HEARTBEAT HUD */}
+      <EngineActivityStream
+        assets={assets}
+        botState={botState}
+        onSelectAsset={(sym) => setSelectedSymbol(sym)}
+      />
 
       {/* 1. TOP INSTITUTIONAL METRICS STRIP */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4">
@@ -1248,14 +1276,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>Tier: <strong className="text-white">{calculateEquityLotSize(portfolio.totalEquity).toFixed(2)} Lots</strong> @ ${portfolio.totalEquity.toFixed(0)} Eq</span>
             </div>
           </div>
-          {positions.length > 0 && (
-            <button
-              onClick={onEmergencyCloseAll}
-              className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-3 py-1.5 text-xs font-semibold text-[#EF4444] hover:bg-[#EF4444]/20 transition-colors"
-            >
-              Close All Positions
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {onOpenStatementModal && (
+              <button
+                onClick={onOpenStatementModal}
+                className="flex items-center space-x-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 transition-colors"
+                title="Generate 1-Click Verified Performance Statement (PDF / Print / CSV)"
+              >
+                <FileText className="h-3.5 w-3.5 text-blue-400" />
+                <span>Verified Statement</span>
+              </button>
+            )}
+            {positions.length > 0 && (
+              <button
+                onClick={onEmergencyCloseAll}
+                className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-3 py-1.5 text-xs font-semibold text-[#EF4444] hover:bg-[#EF4444]/20 transition-colors"
+              >
+                Close All Positions
+              </button>
+            )}
+          </div>
         </div>
 
         {positions.length === 0 ? (
@@ -1272,14 +1312,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                 const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 const lotStr = formatPositionLotSize(pos);
+
+                // Zero-risk breakeven check
+                const isBreakeven = Boolean(
+                  pos.breakevenLocked ||
+                  (pos.side === 'LONG' && pos.stopLossPrice >= pos.entryPrice) ||
+                  (pos.side === 'SHORT' && pos.stopLossPrice <= pos.entryPrice)
+                );
+
+                // Progress to Take Profit
+                const tpProgress = Math.min(
+                  100,
+                  Math.max(
+                    0,
+                    pos.side === 'LONG'
+                      ? ((pos.currentPrice - pos.entryPrice) / Math.max(0.0001, pos.takeProfitPrice - pos.entryPrice)) * 100
+                      : ((pos.entryPrice - pos.currentPrice) / Math.max(0.0001, pos.entryPrice - pos.takeProfitPrice)) * 100
+                  )
+                );
+
                 return (
                   <div
                     key={pos.id}
-                    className="rounded-xl border border-[#1F1F23] bg-[#0E0E11] p-3.5 space-y-3 font-mono text-xs"
+                    className={`rounded-xl border p-3.5 space-y-3 font-mono text-xs transition-all ${
+                      isBreakeven
+                        ? 'border-emerald-500/40 bg-[#0A120E] shadow-sm shadow-emerald-950/40'
+                        : 'border-[#1F1F23] bg-[#0E0E11]'
+                    }`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-bold text-sm text-white">{pos.symbol}</span>
                           <span
                             className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
@@ -1294,6 +1357,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-[10px]">
                             {lotStr} Lots
                           </span>
+
+                          {/* Zero-Risk Breakeven Badge */}
+                          {isBreakeven && (
+                            <span
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 font-bold text-[10px] shadow-sm shadow-emerald-950/40 animate-pulse"
+                              title="Stop Loss is locked at or above entry. Downside risk is $0.00!"
+                            >
+                              <Lock className="h-3 w-3 text-emerald-400" />
+                              <span>🔒 ZERO-RISK</span>
+                            </span>
+                          )}
+
+                          {/* Partial Profit Banked Badge */}
+                          {pos.partialProfitTaken && (
+                            <span
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px]"
+                              title="50% lots closed into realized cash balance. Remaining runner active."
+                            >
+                              <Coins className="h-3 w-3 text-amber-400" />
+                              <span>💰 +50% BANKED</span>
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-[#8E9299] mt-0.5">
                           {pos.strategyName} • Qty: {pos.size} (${pos.sizeUsd.toLocaleString()})
@@ -1307,6 +1392,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="text-[10px] text-[#8E9299]">
                           ({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)
                         </span>
+                      </div>
+                    </div>
+
+                    {/* Progress to Take Profit Target */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] text-[#8E9299]">
+                        <span>TP Target Progress:</span>
+                        <span className="text-emerald-400 font-bold">{tpProgress.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-[#18181C] rounded-full overflow-hidden border border-[#27272A]">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full transition-all duration-300"
+                          style={{ width: `${tpProgress}%` }}
+                        />
                       </div>
                     </div>
 
@@ -1334,7 +1433,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                       <div>
                         <span className="text-[10px] text-[#8E9299] block">Stop Loss:</span>
-                        <span className="text-[#EF4444]">{formatPosPrice(pos.symbol, pos.stopLossPrice)}</span>
+                        <span className={isBreakeven ? 'text-emerald-400 font-bold' : 'text-[#EF4444]'}>
+                          {formatPosPrice(pos.symbol, pos.stopLossPrice)} {isBreakeven && '(BE)'}
+                        </span>
                       </div>
                       <div>
                         <span className="text-[10px] text-[#8E9299] block">Take Profit:</span>
@@ -1364,7 +1465,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Desktop Full Data Table (hidden md:block) */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono min-w-[920px]">
+              <table className="w-full text-left text-xs font-mono min-w-[960px]">
                 <thead>
                   <tr className="border-b border-[#1F1F23] text-[#8E9299] uppercase text-[10px]">
                     <th className="py-2.5 px-3">Asset</th>
@@ -1376,6 +1477,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <th className="py-2.5 px-3">Current Price</th>
                     <th className="py-2.5 px-3">Stop Loss</th>
                     <th className="py-2.5 px-3">Take Profit</th>
+                    <th className="py-2.5 px-3">Safety Status</th>
                     <th className="py-2.5 px-3">Unrealized P&L</th>
                     <th className="py-2.5 px-3">Strategy</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
@@ -1388,8 +1490,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     const dateStr = openedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
                     const timeStr = openedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     const lotStr = formatPositionLotSize(pos);
+
+                    // Zero-risk breakeven check
+                    const isBreakeven = Boolean(
+                      pos.breakevenLocked ||
+                      (pos.side === 'LONG' && pos.stopLossPrice >= pos.entryPrice) ||
+                      (pos.side === 'SHORT' && pos.stopLossPrice <= pos.entryPrice)
+                    );
+
                     return (
-                      <tr key={pos.id} className="hover:bg-[#1F1F23]/30 transition-colors">
+                      <tr
+                        key={pos.id}
+                        className={`transition-colors ${
+                          isBreakeven
+                            ? 'bg-emerald-950/15 hover:bg-emerald-950/25 border-l-2 border-l-emerald-400'
+                            : 'hover:bg-[#1F1F23]/30'
+                        }`}
+                      >
                         <td className="py-3 px-3 font-bold text-white">
                           <div className="flex items-center space-x-1.5">
                             <span>{pos.symbol}</span>
@@ -1429,16 +1546,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </td>
                         <td className="py-3 px-3 text-[#E4E4E7]">{formatPosPrice(pos.symbol, pos.entryPrice)}</td>
                         <td className="py-3 px-3 text-white font-bold">{formatPosPrice(pos.symbol, pos.currentPrice)}</td>
-                        <td className="py-3 px-3 text-[#EF4444]">{formatPosPrice(pos.symbol, pos.stopLossPrice)}</td>
+                        <td className="py-3 px-3">
+                          <span className={isBreakeven ? 'text-emerald-400 font-bold' : 'text-[#EF4444]'}>
+                            {formatPosPrice(pos.symbol, pos.stopLossPrice)}
+                          </span>
+                        </td>
                         <td className="py-3 px-3 text-[#10B981]">{formatPosPrice(pos.symbol, pos.takeProfitPrice)}</td>
+                        {/* Safety Status Badges */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="flex flex-col space-y-1">
+                            {isBreakeven ? (
+                              <span
+                                className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 font-bold text-[10px] shadow-sm shadow-emerald-950/40 animate-pulse w-fit"
+                                title="Stop loss moved past entry. Zero downside risk."
+                              >
+                                <Lock className="h-2.5 w-2.5 text-emerald-400" />
+                                <span>🔒 ZERO-RISK</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-[#8E9299] font-mono">
+                                Trailing...
+                              </span>
+                            )}
+                            {pos.partialProfitTaken && (
+                              <span
+                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[9px] w-fit"
+                                title="50% lots closed into realized cash balance"
+                              >
+                                <Coins className="h-2.5 w-2.5 text-amber-400" />
+                                <span>💰 +50% BANKED</span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-3 px-3">
                           <div className={`font-bold ${isProfit ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
                             {isProfit ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
                             <span className="text-[10px] ml-1 opacity-80">({isProfit ? '+' : ''}{pos.unrealizedPnlPercent}%)</span>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-[#8E9299] truncate max-w-[140px]">{pos.strategyName}</td>
-                        <td className="py-3 px-3 text-right space-x-2">
+                        <td className="py-3 px-3 text-[#8E9299] truncate max-w-[120px]">{pos.strategyName}</td>
+                        <td className="py-3 px-3 text-right space-x-2 whitespace-nowrap">
                           <button
                             onClick={() => onOpenExplanationModal(pos.explanationId || pos.id, pos)}
                             className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-xs text-purple-300 hover:bg-purple-500/20 transition-colors"

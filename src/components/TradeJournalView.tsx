@@ -26,6 +26,7 @@ import {
   Zap,
   BarChart3,
   Calendar,
+  FileText,
 } from 'lucide-react';
 import {
   TradeHistoryItem,
@@ -42,6 +43,7 @@ interface TradeJournalViewProps {
   tradesHistory: TradeHistoryItem[];
   onNavigateTab?: (tab: string) => void;
   onTradeReviewed?: (trade: TradeHistoryItem) => void;
+  onOpenStatementModal?: () => void;
 }
 
 const PRESET_MISTAKE_TAGS = [
@@ -76,6 +78,7 @@ export const TradeJournalView: React.FC<TradeJournalViewProps> = ({
   tradesHistory = [],
   onNavigateTab,
   onTradeReviewed,
+  onOpenStatementModal,
 }) => {
   const { user } = useAuth();
 
@@ -527,6 +530,18 @@ export const TradeJournalView: React.FC<TradeJournalViewProps> = ({
             >
               <AlertTriangle className="h-3.5 w-3.5" />
               <span>{stats.pendingCount} Pending Review</span>
+            </button>
+          )}
+
+          {onOpenStatementModal && (
+            <button
+              type="button"
+              onClick={onOpenStatementModal}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 hover:text-white text-xs font-medium transition-colors"
+              title="View & Export Cryptographically Verified Performance Statement"
+            >
+              <FileText className="h-3.5 w-3.5 text-blue-400" />
+              <span>Verified Statement</span>
             </button>
           )}
 

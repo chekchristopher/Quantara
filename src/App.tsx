@@ -18,6 +18,9 @@ import { EnterpriseAuthModal } from './components/EnterpriseAuthModal';
 import { OfflineWealthReportModal } from './components/OfflineWealthReportModal';
 import { LandingPageView } from './components/LandingPageView';
 import { MarketTickerRibbon } from './components/MarketTickerRibbon';
+import { FloatingSafetyDock } from './components/FloatingSafetyDock';
+import { ToastNotificationCenter } from './components/ToastNotificationCenter';
+import { PerformanceStatementModal } from './components/PerformanceStatementModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { firestoreSync } from './services/firestoreSync';
@@ -122,6 +125,7 @@ function QuantaraApp() {
   const [showLiveConfirmation, setShowLiveConfirmation] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineSessionStats | null>(null);
   const [showOfflineReportModal, setShowOfflineReportModal] = useState<boolean>(false);
+  const [isStatementModalOpen, setIsStatementModalOpen] = useState<boolean>(false);
 
   // Subscribe to Realtime Server-Sent Events (SSE) & 24/7 Engine State
   useEffect(() => {
@@ -621,7 +625,7 @@ function QuantaraApp() {
       />
 
       {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-24 md:pb-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-32 md:pb-20 space-y-6">
         {/* Landing Page: strictly visible only when NOT signed in */}
         {!user && currentTab === 'landing' && (
           <LandingPageView
@@ -647,6 +651,9 @@ function QuantaraApp() {
             onPlaceManualOrder={handlePlaceManualOrder}
             onOpenExplanationModal={(id, data) => setExplanationTarget({ id, data })}
             onNavigateTab={setCurrentTab}
+            onSelectRiskProfile={handleSelectRiskProfile}
+            onToggleAutonomousTakeover={handleToggleTakeover}
+            onOpenStatementModal={() => setIsStatementModalOpen(true)}
           />
         )}
 
@@ -743,6 +750,7 @@ function QuantaraApp() {
           <TradeJournalView
             tradesHistory={tradesHistory}
             onNavigateTab={setCurrentTab}
+            onOpenStatementModal={() => setIsStatementModalOpen(true)}
             onTradeReviewed={(updatedTrade) => {
               setTradesHistory((prev) =>
                 prev.map((t) => (t.id === updatedTrade.id ? updatedTrade : t))
@@ -802,6 +810,38 @@ function QuantaraApp() {
         onResumeBot={handleToggleBot}
         onViewJournal={() => setCurrentTab('workbook')}
       />
+
+      {/* 1-Click Verified Performance Statement Modal */}
+      <PerformanceStatementModal
+        isOpen={isStatementModalOpen}
+        onClose={() => setIsStatementModalOpen(false)}
+        portfolio={portfolio}
+        botState={botState}
+        tradesHistory={tradesHistory}
+        riskSettings={riskSettings}
+        brokerAccounts={brokerAccounts}
+      />
+
+      {/* Real-time Toast Notifications with Web Audio Chimes */}
+      <ToastNotificationCenter
+        notifications={notifications}
+        positions={positions}
+      />
+
+      {/* Persistent Floating Emergency Safety Dock */}
+      {(currentTab !== 'landing' || user) && (
+        <FloatingSafetyDock
+          portfolio={portfolio}
+          botState={botState}
+          positions={positions}
+          riskSettings={riskSettings}
+          brokerAccounts={brokerAccounts}
+          onToggleBot={handleToggleBot}
+          onEmergencyCloseAll={handleEmergencyCloseAll}
+          onOpenStatementModal={() => setIsStatementModalOpen(true)}
+          onNavigateTab={setCurrentTab}
+        />
+      )}
 
       {/* Global Status Bar Footer */}
       <footer className="border-t border-[#1F1F23] bg-[#0E0E11] py-3 px-4 sm:px-8 text-xs font-mono text-[#8E9299]">
