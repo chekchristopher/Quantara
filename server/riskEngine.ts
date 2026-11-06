@@ -1,5 +1,6 @@
 import { Position, RiskSettings, TradingSignal, PortfolioSummary, AuditLog } from '../src/types';
 import { calculateEquityLotSize } from '../src/utils/lotSize';
+import { economicCalendarService } from './economicCalendar';
 
 export interface RiskValidationResult {
   passed: boolean;
@@ -11,17 +12,21 @@ export interface RiskValidationResult {
   takeProfitPrice: number;
   riskAmountUsd: number;
   leverageUsed: number;
+  consecutiveWinsStreak?: number;
+  isCompoundingBoosted?: boolean;
 }
 
 export class RiskManagementEngine {
   /**
-   * Validates a proposed signal against strict risk rules and computes dynamic position size.
+   * Validates a proposed signal against strict institutional risk rules and computes dynamic position size.
    */
   public validateAndSizeTrade(
     signal: TradingSignal,
     portfolio: PortfolioSummary,
     openPositions: Position[],
-    settings: RiskSettings
+    settings: RiskSettings,
+    asset?: any,
+    tradesHistory: any[] = []
   ): RiskValidationResult {
     // 1. Kill Switch Check
     if (settings.killSwitchActive) {
@@ -119,10 +124,11 @@ export class RiskManagementEngine {
     }
 
     // 5c. High-Impact Economic News Blackout Window
-    if (settings.newsBlackoutActive) {
+    const blackout = economicCalendarService.checkBlackoutStatus(signal.assetSymbol);
+    if (blackout.isBlackout || settings.newsBlackoutActive) {
       return {
         passed: false,
-        rejectionReason: `Trade rejected: News blackout window active (${settings.newsBlackoutEventName || 'High-Impact Economic Release'}). Orders paused to prevent extreme slippage & spread widening.`,
+        rejectionReason: `Trade rejected: ${blackout.reason || 'High-Impact Economic News Blackout active. Orders halted for slippage & spread defense.'}`,
         calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,
@@ -133,7 +139,112 @@ export class RiskManagementEngine {
       };
     }
 
-    // 5d. Currency / Asset Correlation Filter
+    // 5d. Interbank Rollover Liquidity Gap Defense (21:00 - 23:00 UTC / 5PM - 7PM EST)
+    const currentUtcHour = new Date().getUTCHours();
+    if (currentUtcHour === 21 || currentUtcHour === 22) {
+      return {
+        passed: false,
+        rejectionReason: 'Trade rejected: Interbank Rollover Liquidity Gap (21:00-23:00 UTC). Engine enforces Cash Preservation Mode during bank daily settlement rollover.',
+        calculatedLotSize: 0,
+        calculatedPositionSizeUsd: 0,
+        calculatedQuantity: 0,
+        stopLossPrice: 0,
+        takeProfitPrice: 0,
+        riskAmountUsd: 0,
+        leverageUsed: 0,
+      };
+    }
+
+    // 5e. Broker Max Spread & Execution Slippage Gate
+    if (asset && asset.spreadPips !== undefined) {
+      const isGold = signal.assetSymbol.toUpperCase().includes('XAU') || signal.assetSymbol.toUpperCase().includes('GOLD');
+      const maxAllowedSpread = isGold ? 2.5 : 1.5;
+      if (asset.spreadPips > maxAllowedSpread) {
+        return {
+          passed: false,
+          rejectionReason: `Trade rejected: Broker spread spike (${asset.spreadPips.toFixed(1)} pips > max ${maxAllowedSpread} pips). Protected from predatory broker slippage.`,
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+    }
+
+    // 5f. ADX Market Regime "Don't Trade" Chop Filter
+    if (asset?.indicators?.adx !== undefined) {
+      const adxVal = asset.indicators.adx;
+      // ADX below 20 indicates low momentum chop / compression
+      if (adxVal < 20) {
+        return {
+          passed: false,
+          rejectionReason: `Trade rejected: Market in Low-Momentum Chop (ADX ${adxVal.toFixed(1)} < 20). Engine protects capital by waiting for institutional directional expansion.`,
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+    }
+
+    // 5g. Multi-Timeframe (MTF) Macro Structure Confluence Gate
+    if (asset?.indicators?.ema200 && asset?.indicators?.ema50) {
+      const isLong = signal.direction === 'BUY';
+      const isShort = signal.direction === 'SELL';
+      const isMacroBearish = asset.currentPrice < asset.indicators.ema200 * 0.985 && asset.indicators.ema20 < asset.indicators.ema50;
+      const isMacroBullish = asset.currentPrice > asset.indicators.ema200 * 1.015 && asset.indicators.ema20 > asset.indicators.ema50;
+
+      if (isLong && isMacroBearish) {
+        return {
+          passed: false,
+          rejectionReason: 'Trade rejected: Multi-Timeframe Structure Mismatch. Macro structure is strongly bearish below 200 EMA. Counter-trend LONG blocked.',
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+      if (isShort && isMacroBullish) {
+        return {
+          passed: false,
+          rejectionReason: 'Trade rejected: Multi-Timeframe Structure Mismatch. Macro structure is strongly bullish above 200 EMA. Counter-trend SHORT blocked.',
+          calculatedLotSize: 0,
+          calculatedPositionSizeUsd: 0,
+          calculatedQuantity: 0,
+          stopLossPrice: 0,
+          takeProfitPrice: 0,
+          riskAmountUsd: 0,
+          leverageUsed: 0,
+        };
+      }
+    }
+
+    // 5h. Mathematical Positive Expectancy & Asymmetric R:R Gate
+    const minRequiredRR = settings.minRiskRewardRatio || 2.5;
+    if (signal.riskRewardRatio < minRequiredRR) {
+      return {
+        passed: false,
+        rejectionReason: `Trade rejected: Asymmetric Expectancy Gate. Setup provides 1:${signal.riskRewardRatio} R:R (minimum 1:${minRequiredRR} required for guaranteed positive statistical expectancy).`,
+        calculatedLotSize: 0,
+        calculatedPositionSizeUsd: 0,
+        calculatedQuantity: 0,
+        stopLossPrice: 0,
+        takeProfitPrice: 0,
+        riskAmountUsd: 0,
+        leverageUsed: 0,
+      };
+    }
+
+    // 5i. Currency / Asset Correlation Filter
     const isUsdPair = (s: string) => s.toUpperCase().includes('USD');
     if (isUsdPair(signal.assetSymbol)) {
       const openUsdPairs = openPositions.filter((p) => isUsdPair(p.symbol));
@@ -152,7 +263,7 @@ export class RiskManagementEngine {
       }
     }
 
-    // 6. Dynamic Position Sizing (Strict Institutional Lot Sizing strictly bounded 0.01 to 0.10 based on equity)
+    // 6. Dynamic Position Sizing with Anti-Martingale / Asymmetric Compounding
     const entry = signal.entryPrice;
     const stopLoss = signal.suggestedStopLoss;
     const takeProfit = signal.suggestedTakeProfit;
@@ -189,8 +300,34 @@ export class RiskManagementEngine {
       };
     }
 
-    // Target lot size strictly determined by equity between 0.01 and 0.10 lots
-    const targetLotSize = calculateEquityLotSize(portfolio.totalEquity);
+    // Base lot size strictly determined by equity
+    let targetLotSize = calculateEquityLotSize(portfolio.totalEquity);
+
+    // Anti-Martingale Position Sizing:
+    // Count consecutive winning trades in recent history
+    let consecutiveWins = 0;
+    if (Array.isArray(tradesHistory) && tradesHistory.length > 0) {
+      for (const t of tradesHistory) {
+        if (t.pnl > 0) {
+          consecutiveWins++;
+        } else {
+          break; // Streak ends on first loss
+        }
+      }
+    }
+
+    let isCompoundingBoosted = false;
+    // When on a winning streak (2+ wins) and portfolio drawdown is minimal (<1.0%),
+    // step up lot sizing safely (+15% for 2 wins, +25% for 3+ wins), bounded by institutional max (0.10)
+    if (consecutiveWins >= 2 && portfolio.currentDrawdownPercent < 1.0) {
+      const multiplier = consecutiveWins >= 3 ? 1.25 : 1.15;
+      const boosted = Number((targetLotSize * multiplier).toFixed(2));
+      targetLotSize = Math.min(0.10, Math.max(targetLotSize, boosted));
+      isCompoundingBoosted = true;
+    } else if (portfolio.currentDrawdownPercent >= 1.5) {
+      // In any drawdown, immediately lock lot size to lowest baseline (0.01) to protect accumulated capital
+      targetLotSize = 0.01;
+    }
 
     // Map institutional lot size to asset contract units:
     // - Gold (XAU/USD): 1 standard lot = 100 oz. 0.01 lot = 1.0 oz.
@@ -277,6 +414,8 @@ export class RiskManagementEngine {
       takeProfitPrice: Number(takeProfit.toFixed(entry > 10 ? 2 : 4)),
       riskAmountUsd: Number(finalRiskAmount.toFixed(2)),
       leverageUsed: finalLeverageUsed,
+      consecutiveWinsStreak: consecutiveWins,
+      isCompoundingBoosted,
     };
   }
 

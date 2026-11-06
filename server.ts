@@ -15,6 +15,7 @@ import { RiskSettings, TradingMode, EnvironmentMode, RiskProfileType } from './s
 import { calculateEquityLotSize } from './src/utils/lotSize';
 import { generateOrderBookDepth } from './src/utils/orderBook';
 import { RISK_PROFILES, getProfileSettings } from './src/data/riskProfiles';
+import { economicCalendarService } from './server/economicCalendar';
 
 dotenv.config();
 
@@ -589,6 +590,13 @@ app.post('/api/risk/settings', (req, res) => {
   db.addAuditLog('RISK', 'RISK_PARAMETERS_UPDATED', 'Updated risk limits (Risk/trade, max daily loss, max drawdown).');
   tradingEngine.broadcastState();
   res.json({ success: true, riskSettings: db.riskSettings });
+});
+
+app.get('/api/economic/calendar', (req, res) => {
+  res.json({
+    events: economicCalendarService.getUpcomingEvents(),
+    blackoutStatus: economicCalendarService.checkBlackoutStatus(),
+  });
 });
 
 // -----------------------------------------------------------------------------

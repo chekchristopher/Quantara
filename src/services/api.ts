@@ -31,6 +31,13 @@ export interface SnapshotData {
   riskSettings: RiskSettings;
   brokerAccounts: BrokerAccount[];
   offlineSessionStats?: import('../types').OfflineSessionStats;
+  economicEvents?: any[];
+  blackoutStatus?: {
+    isBlackout: boolean;
+    activeEvent?: any;
+    minutesUntilEvent?: number;
+    reason?: string;
+  };
 }
 
 export const api = {
@@ -428,6 +435,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(review),
     });
+    return res.json();
+  },
+
+  // Macro Economic Calendar & News Blackout
+  async getEconomicCalendar(): Promise<{ events: any[]; blackoutStatus: any }> {
+    const res = await fetch('/api/economic/calendar');
     return res.json();
   },
 };

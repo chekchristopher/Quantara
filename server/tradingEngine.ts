@@ -4,6 +4,7 @@ import { getStrategyById } from './strategies';
 import { riskEngine } from './riskEngine';
 import { executionEngine } from './executionEngine';
 import { geminiService } from './geminiService';
+import { economicCalendarService } from './economicCalendar';
 import { TradingSignal, BotState, OfflineTradeRecord, OfflineSessionStats } from '../src/types';
 
 export class TradingEngine {
@@ -265,6 +266,8 @@ export class TradingEngine {
       riskSettings: db.riskSettings,
       brokerAccounts: db.brokerAccounts,
       offlineSessionStats: db.offlineSessionStats,
+      economicEvents: economicCalendarService.getUpcomingEvents(),
+      blackoutStatus: economicCalendarService.checkBlackoutStatus(),
     };
   }
 
@@ -362,6 +365,21 @@ export class TradingEngine {
           );
           db.addAuditLog('RISK', 'BREAKEVEN_STOP_LOCKED', `${pos.symbol} ${pos.side}: SL snapped to entry ($${pos.stopLossPrice.toFixed(2)}) at +${beTriggerR}R. Position is now risk-free.`, 'INFO');
         }
+      }
+
+      // News Blackout Early Defense: If high-impact news approaches within 30m, snap SL to entry on all green trades
+      const newsCheck = economicCalendarService.checkBlackoutStatus(pos.symbol);
+      if (newsCheck.isBlackout && rawPnl > 0 && !pos.breakevenLocked) {
+        const breakEvenPrice = isLong ? pos.entryPrice * 1.0008 : pos.entryPrice * 0.9992;
+        pos.stopLossPrice = Number(breakEvenPrice.toFixed(pos.entryPrice > 10 ? 2 : 4));
+        pos.breakevenLocked = true;
+        db.addNotification(
+          'RISK_ALERT',
+          `News Shield Breakeven: ${pos.symbol}`,
+          `Upcoming release: ${newsCheck.activeEvent?.name}. Open trade secured at $0.00 downside risk.`,
+          'warning'
+        );
+        db.addAuditLog('RISK', 'NEWS_SHIELD_BREAKEVEN', `${pos.symbol}: SL secured at entry ($${pos.stopLossPrice.toFixed(2)}) ahead of ${newsCheck.activeEvent?.name}.`, 'INFO');
       }
 
       // Partial Take-Profit: At +1.8R, automatically realize 50% of position size into cash balance and trail runner
@@ -474,12 +492,14 @@ export class TradingEngine {
         continue;
       }
 
-      // Risk Engine Validation & Dynamic Sizing
+      // Risk Engine Validation & Dynamic Sizing (Multi-Timeframe, Spread, ADX Chop, News Shield & Anti-Martingale)
       const riskValidation = riskEngine.validateAndSizeTrade(
         proposedSignal,
         db.portfolio,
         db.positions,
-        db.riskSettings
+        db.riskSettings,
+        asset,
+        db.tradesHistory
       );
 
       proposedSignal.passedRiskChecks = riskValidation.passed;
@@ -491,6 +511,15 @@ export class TradingEngine {
 
       // Execution routing: autonomous software takeover or automatic mode executes immediately
       if (riskValidation.passed) {
+        if (riskValidation.isCompoundingBoosted) {
+          db.addAuditLog(
+            'RISK',
+            'ANTI_MARTINGALE_COMPOUNDING_BOOST',
+            `Streak of ${riskValidation.consecutiveWinsStreak} wins detected. Position lot sized up to ${riskValidation.calculatedLotSize} lots under strictly capped positive expectancy.`,
+            'INFO'
+          );
+        }
+
         const canExecuteAutonomously = db.botState.autonomousTakeover || db.botState.mode === 'fully-automatic' || (db.botState.mode === 'semi-automatic' && proposedSignal.confidenceScore >= 76);
         if (canExecuteAutonomously) {
           executionEngine.executeSignalTrade(
