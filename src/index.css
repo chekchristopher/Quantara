@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --bg-app: #0A0A0B;
@@ -14,9 +15,9 @@
 html.light,
 html[data-theme="light"],
 body.light {
-  --bg-app: #F8FAFC;
+  --bg-app: #FFFFFF;
   --bg-surface: #FFFFFF;
-  --bg-subsurface: #F1F5F9;
+  --bg-subsurface: #F8FAFC;
   --bg-well: #F8FAFC;
   --border-color: #E2E8F0;
   --border-subtle: #CBD5E1;
@@ -81,7 +82,7 @@ html.theme-transition *:after {
 html.light,
 html[data-theme="light"],
 body.light {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
 
@@ -91,11 +92,11 @@ html.light .min-h-screen.bg-\[\#0A0A0B\],
 html.light div.bg-\[\#0A0A0B\],
 html.light #root,
 html.light main {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
 
-/* 2. Elevated Cards & Structural Modules (Crisp White on Light Slate Canvas) */
+/* 2. Elevated Cards & Structural Modules (Pure Crisp White on White Canvas) */
 html.light .bg-\[\#141416\],
 html.light .bg-\[\#0E0E11\],
 html.light .bg-\[\#0E0E12\],
@@ -103,22 +104,25 @@ html.light .bg-\[\#09090B\],
 html.light .bg-\[\#0D1017\],
 html.light .bg-\[\#0A0D14\],
 html.light .bg-\[\#0A0D15\],
+html.light .bg-\[\#101014\],
+html.light .bg-\[\#0E1015\],
 html.light .bg-\[\#070709\],
-html.light .bg-zinc-950,
-html.light .bg-zinc-900:not([class*="hover"]):not(button) {
-  background-color: #FFFFFF !important;
-  border-color: #E2E8F0 !important;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.02) !important;
-}
-
-/* 3. Sub-Panels, Wells, Inner Boxes & Secondary Containers (Soft Slate-50) */
+html.light .bg-\[\#08120D\],
+html.light .bg-\[\#0F0E0B\],
+html.light .bg-\[\#0C0E14\],
+html.light .bg-\[\#0D0F17\],
+html.light .bg-\[\#101420\],
+html.light .bg-\[\#0E1420\],
+html.light .bg-\[\#0E1522\],
+html.light .bg-\[\#161208\],
+html.light .bg-\[\#14161E\],
+html.light .bg-\[\#141A29\],
+html.light .bg-\[\#181D2B\],
 html.light .bg-\[\#12131A\],
 html.light .bg-\[\#141724\],
 html.light .bg-\[\#141418\],
 html.light .bg-\[\#121622\],
 html.light .bg-\[\#141722\],
-html.light .bg-\[\#0E1420\],
-html.light .bg-\[\#101420\],
 html.light .bg-\[\#0E121B\],
 html.light .bg-\[\#0E1017\],
 html.light .bg-\[\#121724\],
@@ -131,13 +135,56 @@ html.light .bg-\[\#10131C\],
 html.light .bg-\[\#090C12\],
 html.light .bg-\[\#1A1F30\],
 html.light .bg-\[\#171B28\],
+html.light .bg-\[\#0A0A0E\],
+html.light .bg-\[\#0C0D11\],
+html.light .bg-\[\#0D1018\],
+html.light .bg-\[\#0E111A\],
+html.light .bg-\[\#0E121C\],
+html.light .bg-\[\#0E121D\],
+html.light .bg-\[\#0F1422\],
+html.light .bg-\[\#101015\],
+html.light .bg-\[\#11141E\],
+html.light .bg-\[\#111520\],
+html.light .bg-\[\#120D0E\],
+html.light .bg-\[\#121215\],
+html.light .bg-\[\#121216\],
+html.light .bg-\[\#121218\],
+html.light .bg-\[\#12141C\],
+html.light .bg-\[\#121520\],
+html.light .bg-\[\#14141A\],
+html.light .bg-\[\#151926\],
+html.light .bg-\[\#151928\],
+html.light .bg-\[\#161B28\],
+html.light .bg-\[\#18181C\],
+html.light .bg-\[\#18181E\],
+html.light .bg-\[\#181922\],
+html.light .bg-\[\#181C28\],
+html.light .bg-\[\#181D2D\],
+html.light .bg-\[\#1A1A1E\],
+html.light .bg-\[\#1A1E2C\],
+html.light .bg-\[\#1A2032\],
+html.light .bg-\[\#202636\],
+html.light .bg-\[\#24242A\],
+html.light .bg-\[\#090D14\],
+html.light .bg-\[\#0C111A\],
+html.light .bg-\[\#0A0C13\],
+html.light .bg-\[\#0E1522\]\/80,
+html.light .bg-\[\#161208\]\/60,
+html.light .bg-\[\#0E1322\]\/95,
+html.light .bg-\[\#091812\]\/95,
+html.light .bg-\[\#1A1608\]\/95,
+html.light .bg-\[\#1C0D0F\]\/95,
+html.light .bg-\[\#0A161E\]\/95,
+html.light .bg-zinc-950,
+html.light .bg-zinc-900:not([class*="hover"]):not(button),
 html.light .bg-slate-950,
 html.light .bg-slate-900 {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   border-color: #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.02) !important;
 }
 
-/* 4. Interactive Pills, Inactive Chips, Dropdown Menus & Hover Targets */
+/* 3. Sub-Panels, Wells, Inner Insets & Secondary Boxes */
 html.light .bg-\[\#1F1F23\],
 html.light .bg-\[\#2E2E33\],
 html.light .bg-\[\#2A2A30\],
@@ -148,9 +195,9 @@ html.light .bg-\[\#151924\],
 html.light .bg-\[\#1B1D24\],
 html.light .bg-zinc-800,
 html.light .bg-slate-800 {
-  background-color: #F1F5F9 !important;
+  background-color: #F8FAFC !important;
   border-color: #CBD5E1 !important;
-  color: #334155 !important;
+  color: #0F172A !important;
 }
 
 /* Hover States for Inactive Controls */
@@ -189,6 +236,38 @@ html.light header {
   background-color: rgba(255, 255, 255, 0.98) !important;
   border-bottom: 1px solid #E2E8F0 !important;
   box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Floating Safety Dock & Action Pills in Light Theme */
+html.light .bg-\[\#0C0E14\]\/95,
+html.light .bg-\[\#0C0E14\] {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light .bg-\[\#141824\] {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+html.light .bg-\[\#141824\]:hover,
+html.light .hover\:bg-\[\#1C2234\]:hover {
+  background-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+html.light .bg-\[\#182030\] {
+  background-color: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+  color: #1D4ED8 !important;
+}
+
+html.light .hover\:bg-\[\#202B40\]:hover {
+  background-color: #DBEAFE !important;
+  color: #1E40AF !important;
 }
 
 html.light nav.fixed.bottom-0 {
@@ -255,12 +334,54 @@ html.light .border-\[\#1A1D27\],
 html.light .border-\[\#181C26\],
 html.light .border-\[\#1B1B20\],
 html.light .border-\[\#2B2B33\],
+html.light .border-\[\#1F2536\],
+html.light .border-\[\#1A2234\],
+html.light .border-\[\#1E2638\],
+html.light .border-\[\#2A2A30\],
+html.light .border-\[\#26262F\],
+html.light .border-\[\#181D2C\],
+html.light .border-\[\#191E2C\],
+html.light .border-\[\#1A1F2C\],
+html.light .border-\[\#1E2332\],
+html.light .border-\[\#1E2333\],
+html.light .border-\[\#1E2434\],
+html.light .border-\[\#1E2435\],
+html.light .border-\[\#232838\],
+html.light .border-\[\#23293D\],
+html.light .border-\[\#242A3B\],
+html.light .border-\[\#1C1F2E\],
+html.light .border-\[\#232B40\],
+html.light .border-\[\#2A3040\],
+html.light .border-\[\#2E2E38\],
+html.light .border-\[\#2B3245\],
+html.light .border-\[\#2C3142\],
 html.light .border-zinc-800,
 html.light .border-zinc-700,
 html.light .border-slate-800,
 html.light .border-slate-700,
 html.light .border-slate-700\/80 {
   border-color: #E2E8F0 !important;
+}
+
+/* Dark Gradients Conversion to Clean White in Light Theme */
+html.light .from-\[\#0C1222\],
+html.light .from-\[\#0C1427\],
+html.light .from-\[\#0C1322\],
+html.light .from-\[\#0E121B\],
+html.light .from-\[\#0D1018\],
+html.light .from-emerald-950\/40,
+html.light .from-emerald-950\/30,
+html.light .from-blue-950\/30 {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+html.light #top-market-ticker-ribbon .from-\[\#0A0D14\] {
+  --tw-gradient-from: #FFFFFF var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
 
 html.light .divide-\[\#1F1F23\] > :not([hidden]) ~ :not([hidden]),
@@ -276,7 +397,13 @@ html.light .text-zinc-200,
 html.light .text-zinc-300,
 html.light .text-slate-100,
 html.light .text-slate-200,
-html.light .text-slate-300 {
+html.light .text-slate-300,
+html.light .text-gray-100,
+html.light .text-gray-200,
+html.light .text-gray-300,
+html.light .text-neutral-100,
+html.light .text-neutral-200,
+html.light .text-neutral-300 {
   color: #0F172A !important;
 }
 
@@ -290,23 +417,37 @@ html.light .text-\[\#A1A1AA\],
 html.light .text-zinc-400,
 html.light .text-zinc-500,
 html.light .text-slate-400,
-html.light .text-slate-500 {
+html.light .text-slate-500,
+html.light .text-gray-400,
+html.light .text-gray-500,
+html.light .text-neutral-400,
+html.light .text-neutral-500 {
   color: #475569 !important;
 }
 
 /* Headings and Titles */
-html.light h1.text-white,
-html.light h2.text-white,
-html.light h3.text-white,
-html.light h4.text-white,
-html.light .font-brand.text-white,
-html.light p.text-white {
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light h5,
+html.light h6,
+html.light .font-brand,
+html.light p.text-white,
+html.light strong.text-white,
+html.light b.text-white,
+html.light label.text-white,
+html.light code.text-white,
+html.light td.text-white,
+html.light th.text-white,
+html.light li.text-white,
+html.light a.text-white {
   color: #0F172A !important;
 }
 
-/* Plain text spans and divs (except those inside solid buttons) */
-html.light div.text-white:not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]):not([class*="bg-[#EF4444]"]):not([class*="bg-[#DC2626]"]):not([class*="bg-[#10B981]"]),
-html.light span.text-white:not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]):not([class*="bg-[#EF4444]"]):not([class*="bg-[#DC2626]"]):not([class*="bg-[#10B981]"]) {
+/* Plain text spans and divs on light backgrounds */
+html.light div.text-white,
+html.light span.text-white {
   color: #0F172A !important;
 }
 
@@ -504,117 +645,130 @@ html.light textarea::placeholder {
   color: #94A3B8 !important;
 }
 
-/* Permanent Deep-Dark Trading Cockpit Blocks (Never Light / Never Washed Out) */
-.trading-cockpit-card,
+/* Cockpit Hero & Banner Cards */
+.trading-cockpit-card {
+  background-color: #0A0D14;
+  background-image: linear-gradient(135deg, #0A0D14 0%, #101420 50%, #080A0F 100%);
+  border-color: #1F2638;
+  color: #F1F5F9;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+.trading-cockpit-card-amber {
+  background-color: #0F0E0B;
+  background-image: linear-gradient(135deg, #120F08 0%, #1A140B 50%, #0D0A05 100%);
+  border-color: #382A14;
+  color: #F1F5F9;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+
+/* Light Theme Conversion: Pure White Surfaces & Dark Typography */
 html.light .trading-cockpit-card,
 html[data-theme="light"] .trading-cockpit-card,
 body.light .trading-cockpit-card {
-  background-color: #0A0D14 !important;
-  background-image: linear-gradient(135deg, #0A0D14 0%, #101420 50%, #080A0F 100%) !important;
-  border-color: #1F2638 !important;
-  color: #F1F5F9 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03) !important;
 }
 
-.trading-cockpit-card h1,
-.trading-cockpit-card h2,
-.trading-cockpit-card h3,
-.trading-cockpit-card h4,
 html.light .trading-cockpit-card h1,
 html.light .trading-cockpit-card h2,
 html.light .trading-cockpit-card h3,
 html.light .trading-cockpit-card h4,
 html.light .trading-cockpit-card span.text-white,
 html.light .trading-cockpit-card div.text-white,
-html.light .trading-cockpit-card strong.text-white {
-  color: #FFFFFF !important;
+html.light .trading-cockpit-card strong.text-white,
+html.light .trading-cockpit-card b.text-white {
+  color: #0F172A !important;
 }
 
-.trading-cockpit-card p,
 html.light .trading-cockpit-card p,
-html.light .trading-cockpit-card .text-\[\#8E9299\] {
-  color: #94A3B8 !important;
+html.light .trading-cockpit-card .text-\[\#8E9299\],
+html.light .trading-cockpit-card .text-zinc-400 {
+  color: #475569 !important;
 }
 
 html.light .trading-cockpit-card .text-blue-300,
-html.light .trading-cockpit-card span.text-blue-300 {
-  color: #93C5FD !important;
-}
-
+html.light .trading-cockpit-card span.text-blue-300,
 html.light .trading-cockpit-card .text-blue-400,
 html.light .trading-cockpit-card span.text-blue-400 {
-  color: #60A5FA !important;
+  color: #1D4ED8 !important;
+}
+
+html.light .trading-cockpit-card .text-emerald-300,
+html.light .trading-cockpit-card span.text-emerald-300,
+html.light .trading-cockpit-card .text-emerald-200 {
+  color: #047857 !important;
 }
 
 html.light .trading-cockpit-card .bg-blue-950\/60,
-html.light .trading-cockpit-card .bg-blue-950\/20 {
-  background-color: rgba(23, 37, 84, 0.6) !important;
-}
-
+html.light .trading-cockpit-card .bg-blue-950\/25,
+html.light .trading-cockpit-card .bg-blue-950\/20,
 html.light .trading-cockpit-card .bg-blue-500\/10,
 html.light .trading-cockpit-card .bg-blue-500\/15,
 html.light .trading-cockpit-card .bg-blue-500\/20 {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border-color: rgba(59, 130, 246, 0.3) !important;
-  color: #93C5FD !important;
+  background-color: #EFF6FF !important;
+  border-color: #BFDBFE !important;
+  color: #1D4ED8 !important;
 }
 
-html.light .trading-cockpit-card .bg-\[\#1F1F23\] {
-  background-color: #1F1F23 !important;
-  color: #FFFFFF !important;
+html.light .trading-cockpit-card .bg-emerald-950\/60,
+html.light .trading-cockpit-card .bg-emerald-500\/10,
+html.light .trading-cockpit-card .bg-emerald-500\/15,
+html.light .trading-cockpit-card .bg-emerald-500\/20 {
+  background-color: #ECFDF5 !important;
+  border-color: #A7F3D0 !important;
+  color: #047857 !important;
 }
 
-.trading-cockpit-card-amber,
+html.light .trading-cockpit-card .bg-\[\#1F1F23\],
+html.light .trading-cockpit-card .bg-\[\#08120D\],
+html.light .trading-cockpit-card .bg-\[\#0A0D14\] {
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
 html.light .trading-cockpit-card-amber,
 html[data-theme="light"] .trading-cockpit-card-amber,
 body.light .trading-cockpit-card-amber {
-  background-color: #0F0E0B !important;
-  background-image: linear-gradient(135deg, #120F08 0%, #1A140B 50%, #0D0A05 100%) !important;
-  border-color: #382A14 !important;
-  color: #F1F5F9 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  border-color: #FDE68A !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 3px 0 rgba(245, 158, 11, 0.08) !important;
 }
 
-.trading-cockpit-card-amber h1,
-.trading-cockpit-card-amber h2,
-.trading-cockpit-card-amber h3,
-.trading-cockpit-card-amber h4,
 html.light .trading-cockpit-card-amber h1,
 html.light .trading-cockpit-card-amber h2,
 html.light .trading-cockpit-card-amber h3,
 html.light .trading-cockpit-card-amber h4,
 html.light .trading-cockpit-card-amber span.text-white,
-html.light .trading-cockpit-card-amber div.text-white {
-  color: #FFFFFF !important;
+html.light .trading-cockpit-card-amber div.text-white,
+html.light .trading-cockpit-card-amber strong.text-white {
+  color: #0F172A !important;
 }
 
-.trading-cockpit-card-amber p,
 html.light .trading-cockpit-card-amber p,
 html.light .trading-cockpit-card-amber .text-\[\#8E9299\] {
-  color: #94A3B8 !important;
+  color: #475569 !important;
 }
 
 html.light .trading-cockpit-card-amber .text-amber-300,
-html.light .trading-cockpit-card-amber span.text-amber-300 {
-  color: #FCD34D !important;
+html.light .trading-cockpit-card-amber span.text-amber-300,
+html.light .trading-cockpit-card-amber .text-amber-400 {
+  color: #B45309 !important;
 }
 
-html.light .trading-cockpit-card-amber .text-amber-400,
-html.light .trading-cockpit-card-amber span.text-amber-400 {
-  color: #FBBF24 !important;
-}
-
-html.light .trading-cockpit-card-amber .bg-amber-950\/60 {
-  background-color: rgba(69, 26, 3, 0.6) !important;
-  border-color: rgba(245, 158, 11, 0.4) !important;
-}
-
+html.light .trading-cockpit-card-amber .bg-amber-950\/60,
 html.light .trading-cockpit-card-amber .bg-amber-500\/10,
 html.light .trading-cockpit-card-amber .bg-amber-500\/15,
 html.light .trading-cockpit-card-amber .bg-amber-500\/20 {
-  background-color: rgba(245, 158, 11, 0.2) !important;
-  border-color: rgba(245, 158, 11, 0.4) !important;
-  color: #FCD34D !important;
+  background-color: #FFFBEB !important;
+  border-color: #FDE68A !important;
+  color: #B45309 !important;
 }
 
 /* Depth Ladder Row Hovers */
@@ -651,6 +805,32 @@ html.light pre {
   background-color: #F1F5F9 !important;
   color: #0F172A !important;
   border-color: #CBD5E1 !important;
+}
+
+/* 13. Institutional Charts & Recharts in Light Mode */
+html.light .recharts-cartesian-grid line {
+  stroke: #E2E8F0 !important;
+}
+
+html.light .recharts-cartesian-axis line {
+  stroke: #E2E8F0 !important;
+}
+
+html.light .recharts-cartesian-axis-tick text,
+html.light .recharts-cartesian-axis-tick-value {
+  fill: #64748B !important;
+}
+
+html.light .recharts-reference-line line {
+  stroke: #94A3B8 !important;
+}
+
+html.light .recharts-default-tooltip {
+  background-color: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08) !important;
+  border-radius: 8px !important;
 }
 
 /* Market Price Ticker Ribbon Animations */

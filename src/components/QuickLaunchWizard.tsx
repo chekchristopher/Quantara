@@ -250,10 +250,21 @@ export const QuickLaunchWizard: React.FC<QuickLaunchWizardProps> = ({
                         {connectedBroker.name}
                       </span>
                     </div>
-                    <div className="flex items-center space-x-1.5 text-[11px] text-[#8E9299]">
-                      <Server className="h-3 w-3 text-emerald-400 shrink-0" />
-                      <span className="font-mono text-zinc-300">
-                        {connectedBroker.server || 'MetaQuotes / Live Bridge'}
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center space-x-1.5 text-[#8E9299]">
+                        <Server className="h-3 w-3 text-emerald-400 shrink-0" />
+                        <span className="font-mono text-zinc-300">
+                          {connectedBroker.server || 'MetaQuotes / Live Bridge'}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${
+                          connectedBroker.accountType === 'DEMO' || connectedBroker.isPaper
+                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                            : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        }`}
+                      >
+                        {connectedBroker.accountType === 'DEMO' || connectedBroker.isPaper ? 'DEMO' : 'REAL LIVE'}
                       </span>
                     </div>
                     <div className="p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-300 flex items-center justify-between">
@@ -267,10 +278,10 @@ export const QuickLaunchWizard: React.FC<QuickLaunchWizardProps> = ({
                       No Broker Account Connected
                     </div>
                     <p className="text-[11px] text-[#8E9299]">
-                      Link your MT5, Exness, or Prop firm login to activate automated server order routing.
+                      Link your MT5, Exness, or Prop firm login (<strong className="text-amber-200">Demo or Real Live</strong>) to activate automated server order routing.
                     </p>
                     <div className="p-1.5 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200">
-                      Standard broker credentials stored locally in encrypted storage.
+                      Supports both risk-free Demo accounts and Real Live capital accounts.
                     </div>
                   </>
                 )}

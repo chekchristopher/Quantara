@@ -92,6 +92,33 @@ export const FloatingSafetyDock: React.FC<FloatingSafetyDockProps> = ({
               </span>
             </button>
 
+            {/* Account Mode Pill: DEMO vs REAL */}
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border shrink-0 flex items-center space-x-1 ${
+                activeBroker?.accountType === 'DEMO' || activeBroker?.isPaper || botState.environment === 'paper'
+                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/35'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+              }`}
+              title={
+                activeBroker?.accountType === 'DEMO' || activeBroker?.isPaper || botState.environment === 'paper'
+                  ? 'Connected Demo / Paper Account (Testing Mode - Zero Capital Risk)'
+                  : 'Connected Real Live Account (Production Trading with Real Capital)'
+              }
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  activeBroker?.accountType === 'DEMO' || activeBroker?.isPaper || botState.environment === 'paper'
+                    ? 'bg-amber-400'
+                    : 'bg-emerald-400 animate-pulse'
+                }`}
+              />
+              <span>
+                {activeBroker?.accountType === 'DEMO' || activeBroker?.isPaper || botState.environment === 'paper'
+                  ? 'DEMO'
+                  : 'REAL LIVE'}
+              </span>
+            </span>
+
             {/* Risk profile badge */}
             <button
               onClick={() => onNavigateTab('risk')}

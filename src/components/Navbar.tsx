@@ -95,6 +95,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const isAdmin = Boolean(profile?.role === 'admin' || user?.email === 'chekchris85@gmail.com');
+
   const navItems: NavItem[] = [
     ...(!user
       ? [
@@ -177,13 +179,17 @@ export const Navbar: React.FC<NavbarProps> = ({
       category: 'System & Telemetry',
       icon: CheckCircle,
     },
-    {
-      id: 'admin',
-      label: 'Admin Telemetry',
-      desc: 'System health, server metrics & Cloud Firestore sync',
-      category: 'System & Telemetry',
-      icon: Sliders,
-    },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin',
+            label: 'Admin Telemetry',
+            desc: 'System health, server metrics & Cloud Firestore sync',
+            category: 'System & Telemetry',
+            icon: Sliders,
+          },
+        ]
+      : []),
   ];
 
   const handleSelectNav = (tabId: string) => {
@@ -261,6 +267,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {botState.isRunning ? 'ACTIVE' : 'PAUSED'}
                 </span>
               </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                  botState.environment === 'paper'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                }`}
+                title={
+                  botState.environment === 'paper'
+                    ? 'Active on Demo / Proving Mode (Virtual Funds)'
+                    : 'Active on Real Live Mode (Real Capital)'
+                }
+              >
+                {botState.environment === 'paper' ? 'DEMO' : 'LIVE'}
+              </span>
               <span className="font-mono text-[11px] text-[#8E9299]">{timeUtc}</span>
             </div>
           </div>

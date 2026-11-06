@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, Brain, Database, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
+import { Activity, Brain, Database, ShieldAlert, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkbookView } from './components/WorkbookView';
@@ -50,12 +50,22 @@ function QuantaraApp() {
   const [currentTab, setCurrentTab] = useState<string>('landing');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
+  // Security Clearance Gate for Administrative Features
+  const isAdmin = Boolean(profile?.role === 'admin' || user?.email === 'chekchris85@gmail.com');
+
   // Automatically switch away from landing page when a user signs in (landing page is only visible to guests who are not signed in)
   useEffect(() => {
     if (user && currentTab === 'landing') {
       setCurrentTab('dashboard');
     }
   }, [user, currentTab]);
+
+  // Security Guard: Prevent non-admins from accessing the admin telemetry tab
+  useEffect(() => {
+    if (currentTab === 'admin' && !isAdmin) {
+      setCurrentTab('dashboard');
+    }
+  }, [currentTab, isAdmin]);
 
   // Core Application State
   const [botState, setBotState] = useState<BotState>({
@@ -764,11 +774,31 @@ function QuantaraApp() {
         )}
 
         {currentTab === 'admin' && (
-          <AdminDashboardView
-            auditLogs={auditLogs}
-            botState={botState}
-            portfolio={portfolio}
-          />
+          isAdmin ? (
+            <AdminDashboardView
+              auditLogs={auditLogs}
+              botState={botState}
+              portfolio={portfolio}
+            />
+          ) : (
+            <div className="max-w-2xl mx-auto my-16 p-8 rounded-2xl border border-red-500/30 bg-[#0E0E12] text-center space-y-4 font-mono shadow-2xl">
+              <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 mx-auto flex items-center justify-center">
+                <ShieldAlert className="h-6 w-6 text-red-400" />
+              </div>
+              <h2 className="text-base font-bold text-white tracking-wide uppercase">
+                Access Restricted • Administrator Clearance Required
+              </h2>
+              <p className="text-xs text-[#8E9299] max-w-md mx-auto leading-relaxed">
+                Admin Telemetry & Server Diagnostics are strictly restricted to verified Quantara system administrators.
+              </p>
+              <button
+                onClick={() => setCurrentTab('dashboard')}
+                className="px-4 py-2 rounded-lg bg-[#182030] hover:bg-[#202B40] text-blue-300 border border-blue-500/30 text-xs font-semibold transition-colors"
+              >
+                Return to Trading Cockpit
+              </button>
+            </div>
+          )
         )}
       </main>
 
