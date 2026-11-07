@@ -13,6 +13,7 @@ interface SubscriptionContextType {
   openPaywall: (source?: string) => void;
   closePaywall: () => void;
   activateSubscription: (txRef?: string, durationDays?: number) => Promise<void>;
+  verifyPayment: (paymentRef: string, durationDays?: number) => Promise<{ success: boolean; message: string; errorDetail?: string }>;
   renewSubscription: () => void;
   expireSubscription: () => void;
 }
@@ -79,11 +80,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     new Date(subscription.expiresAt).getTime() > Date.now()
   );
 
-  const isSubscribed = isAdmin || isTimeValid;
+  // Authentication Enforcement: Unauthenticated users are strictly NOT subscribed
+  const isSubscribed = Boolean(user && (isAdmin || isTimeValid));
 
   // Compute days and hours remaining
   const calculateRemaining = () => {
-    if (!subscription.expiresAt) return { days: 0, hours: 0 };
+    if (!user || !subscription.expiresAt) return { days: 0, hours: 0 };
     const diffMs = new Date(subscription.expiresAt).getTime() - Date.now();
     if (diffMs <= 0) return { days: 0, hours: 0 };
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -93,14 +95,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const { days: daysRemaining, hours: hoursRemaining } = calculateRemaining();
 
-  // Save to localStorage when subscription changes
+  // Save to user-specific localStorage key when subscription changes
   useEffect(() => {
+    if (!user?.uid) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(subscription));
+      localStorage.setItem(`quantara_user_sub_${user.uid}`, JSON.stringify(subscription));
     } catch (e) {
       console.warn('Failed to save subscription:', e);
     }
-  }, [subscription]);
+  }, [subscription, user?.uid]);
 
   // Periodic expiration checker (every 30 seconds)
   useEffect(() => {
@@ -120,27 +123,59 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => clearInterval(interval);
   }, [subscription.status, subscription.expiresAt]);
 
-  // Sync with Firestore profile if user is authenticated
+  // Sync with user's authenticated Firestore profile or reset when logged out
   useEffect(() => {
+    if (!user) {
+      // Unauthenticated visitor: Reset to unpaid default
+      setSubscription(DEFAULT_SUBSCRIPTION);
+      return;
+    }
+
     if (profile?.subscriptionStatus) {
       if (profile.subscriptionStatus === 'active' && profile.subscriptionExpiresAt) {
         const cloudExpiry = new Date(profile.subscriptionExpiresAt).getTime();
         if (cloudExpiry > Date.now()) {
-          setSubscription((prev) => ({
-            ...prev,
+          setSubscription({
             status: 'active',
-            expiresAt: profile.subscriptionExpiresAt!,
-            subscriptionPaymentId: profile.subscriptionPaymentId,
-          }));
+            plan: profile.subscriptionPlan || DEFAULT_SUBSCRIPTION.plan,
+            monthlyFeeUsd: 100,
+            startDate: profile.subscriptionStartDate || new Date().toISOString(),
+            expiresAt: profile.subscriptionExpiresAt,
+            paymentProvider: 'NOWPayments',
+            invoiceId: NOWPAYMENTS_INVOICE_ID,
+            paymentUrl: NOWPAYMENTS_PAYMENT_URL,
+            transactionRef: profile.subscriptionPaymentId || '',
+            isAutoRenew: false,
+            activatedBy: user.email || 'authenticated_operator',
+          });
+          return;
         } else {
           setSubscription((prev) => ({
             ...prev,
             status: 'expired',
           }));
+          return;
         }
       }
     }
-  }, [profile?.subscriptionStatus, profile?.subscriptionExpiresAt]);
+
+    // Check user-specific localStorage cache
+    try {
+      const raw = localStorage.getItem(`quantara_user_sub_${user.uid}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.status === 'active' && parsed?.expiresAt && new Date(parsed.expiresAt).getTime() > Date.now()) {
+          setSubscription(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Default to unpaid if no active subscription on record
+    if (!isAdmin) {
+      setSubscription(DEFAULT_SUBSCRIPTION);
+    }
+  }, [user, profile?.subscriptionStatus, profile?.subscriptionExpiresAt, isAdmin]);
 
   const openPaywall = (source: string = 'general') => {
     setPaywallSource(source);
@@ -199,6 +234,72 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const verifyPayment = async (
+    paymentRef: string,
+    durationDays: number = DURATION_DAYS
+  ): Promise<{ success: boolean; message: string; errorDetail?: string }> => {
+    if (!user) {
+      return {
+        success: false,
+        message: 'Not verified',
+        errorDetail: 'Sign-in required: You must first sign in to your Quantara account before subscribing.',
+      };
+    }
+
+    const trimmed = (paymentRef || '').trim();
+    if (!trimmed) {
+      return {
+        success: false,
+        message: 'Not verified',
+        errorDetail: 'Payment reference is mandatory. Please enter your NOWPayments Payment ID or Transaction Hash.',
+      };
+    }
+
+    try {
+      const res = await fetch('/api/subscription/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: trimmed,
+          durationDays,
+          userEmail: user.email,
+          uid: user.uid,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.verified && data.subscription) {
+        setSubscription(data.subscription);
+        // Sync with Firestore if logged in
+        if (user?.uid) {
+          try {
+            await firestoreSync.updateSubscription(user.uid, {
+              subscriptionStatus: 'active',
+              subscriptionPlan: data.subscription.plan,
+              subscriptionExpiresAt: data.subscription.expiresAt,
+              subscriptionPaymentId: data.subscription.transactionRef,
+            });
+          } catch (err) {
+            console.warn('Could not sync verified subscription to Firestore:', err);
+          }
+        }
+        return { success: true, message: 'Payment successful' };
+      } else {
+        return {
+          success: false,
+          message: data.message || 'Not verified',
+          errorDetail: data.errorDetail || 'The payment reference could not be verified on NOWPayments.',
+        };
+      }
+    } catch (err: any) {
+      return {
+        success: false,
+        message: 'Not verified',
+        errorDetail: err?.message || 'Connection to payment verification service failed.',
+      };
+    }
+  };
+
   const renewSubscription = () => {
     openPaywall('renewal');
   };
@@ -222,6 +323,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         openPaywall,
         closePaywall,
         activateSubscription,
+        verifyPayment,
         renewSubscription,
         expireSubscription,
       }}

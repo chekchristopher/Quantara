@@ -18,12 +18,17 @@ import {
   CreditCard,
   KeyRound,
   RefreshCw,
+  User,
 } from 'lucide-react';
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
 
-export const SubscriptionPaymentModal: React.FC = () => {
+interface SubscriptionPaymentModalProps {
+  onOpenAuthModal?: () => void;
+}
+
+export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> = ({ onOpenAuthModal }) => {
   const {
     subscription,
     isSubscribed,
@@ -33,6 +38,7 @@ export const SubscriptionPaymentModal: React.FC = () => {
     paywallSource,
     closePaywall,
     activateSubscription,
+    verifyPayment,
   } = useSubscription();
 
   const { user, profile } = useAuth();
@@ -40,9 +46,12 @@ export const SubscriptionPaymentModal: React.FC = () => {
 
   const [txInput, setTxInput] = useState<string>('');
   const [copiedInvoice, setCopiedInvoice] = useState<boolean>(false);
-  const [isActivating, setIsActivating] = useState<boolean>(false);
-  const [activationSuccess, setActivationSuccess] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [verificationResult, setVerificationResult] = useState<{
+    status: 'idle' | 'success' | 'failed';
+    message: string;
+    detail?: string;
+  }>({ status: 'idle', message: '' });
 
   if (!isPaywallOpen) return null;
 
@@ -52,28 +61,63 @@ export const SubscriptionPaymentModal: React.FC = () => {
     setTimeout(() => setCopiedInvoice(false), 2000);
   };
 
-  const handleConfirmPayment = async () => {
-    setErrorMsg(null);
-    setIsActivating(true);
+  const handleVerifyAndActivate = async () => {
+    if (!user) {
+      setVerificationResult({
+        status: 'failed',
+        message: 'Not verified',
+        detail: 'Sign-in required: You must first sign in to your Quantara account before subscribing.',
+      });
+      onOpenAuthModal?.();
+      return;
+    }
+
+    const trimmed = txInput.trim();
+    if (!trimmed) {
+      setVerificationResult({
+        status: 'failed',
+        message: 'Not verified',
+        detail: 'Payment reference is mandatory. Please enter your NOWPayments Payment ID or Transaction Hash.',
+      });
+      return;
+    }
+
+    setVerificationResult({ status: 'idle', message: '' });
+    setIsVerifying(true);
 
     try {
-      await activateSubscription(txInput.trim() || undefined, 30);
-      setActivationSuccess(true);
-      setTimeout(() => {
-        setActivationSuccess(false);
-        closePaywall();
-      }, 1800);
+      const res = await verifyPayment(trimmed, 30);
+      if (res.success) {
+        setVerificationResult({
+          status: 'success',
+          message: 'Payment successful',
+          detail: 'Your $100 monthly subscription has been verified and your 30-day Institutional Terminal access is now unlocked.',
+        });
+        setTimeout(() => {
+          closePaywall();
+        }, 2000);
+      } else {
+        setVerificationResult({
+          status: 'failed',
+          message: 'Not verified',
+          detail: res.errorDetail || 'The provided Payment ID could not be confirmed on NOWPayments invoice #5836437268. Please ensure you entered the exact Payment ID or transaction hash.',
+        });
+      }
     } catch (e: any) {
-      setErrorMsg(e?.message || 'Failed to verify activation. Please try again.');
+      setVerificationResult({
+        status: 'failed',
+        message: 'Not verified',
+        detail: e?.message || 'Verification service unreachable. Please check your transaction reference.',
+      });
     } finally {
-      setIsActivating(false);
+      setIsVerifying(false);
     }
   };
 
   const handleAdminBypass = async () => {
-    setIsActivating(true);
+    setIsVerifying(true);
     await activateSubscription('ADMIN_VIP_OVERRIDE_30_DAYS', 30);
-    setIsActivating(false);
+    setIsVerifying(false);
     closePaywall();
   };
 
@@ -202,6 +246,49 @@ export const SubscriptionPaymentModal: React.FC = () => {
             </div>
           </div>
 
+          {/* Account Authentication Gate: Users MUST first sign in before subscribing */}
+          {!user ? (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:p-5 space-y-3">
+              <div className="flex items-center space-x-2 text-amber-300">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white">
+                  Sign In Required Before Subscribing
+                </h4>
+              </div>
+              <p className="text-xs text-amber-200/90 leading-relaxed font-sans">
+                You must first sign in to your Quantara account before subscribing. Once signed in, you can complete the $100 NOWPayments transaction and your 30-day institutional software license will be activated with a green verified tick on your profile.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenAuthModal?.();
+                }}
+                className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+              >
+                <User className="h-3.5 w-3.5" />
+                <span>Sign In / Create Account with Google or Email</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-xs">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="h-7 w-7 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center font-bold font-mono text-[11px] text-emerald-300 shrink-0">
+                  {(profile?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider block">Connected Account</span>
+                  <span className="text-xs font-semibold text-white truncate block">
+                    {user.email || profile?.displayName || 'Authenticated Operator'}
+                  </span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                Authorized
+              </span>
+            </div>
+          )}
+
           {/* NOWPayments Primary Action Area */}
           <div className="rounded-xl border border-[#232A3B] bg-[#141824] p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -289,56 +376,102 @@ export const SubscriptionPaymentModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Activation Step */}
+          {/* Step 2: Mandatory Payment Verification */}
           <div className="rounded-xl border border-[#232A3B] bg-[#141824] p-5 space-y-3.5">
-            <div className="flex items-center space-x-2">
-              <KeyRound className="h-4 w-4 text-blue-400" />
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                Step 2: Activate 30-Day Terminal Access
-              </h4>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <KeyRound className="h-4 w-4 text-blue-400" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Step 2: Verify Payment & Unlock Terminal
+                </h4>
+              </div>
+              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                Mandatory Verification
+              </span>
             </div>
 
             <p className="text-xs text-[#8E9299] leading-relaxed">
-              Once you have submitted your crypto payment on NOWPayments, enter your payment reference, transaction hash, or click below to activate your 30-day license.
+              Once you submit your $100 cryptocurrency payment via NOWPayments, enter your <strong className="text-zinc-200">Payment ID</strong> or <strong className="text-zinc-200">Transaction Hash</strong> below. This is strictly required to verify the crypto transaction and activate your 30-day institutional terminal license.
             </p>
 
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={txInput}
-                onChange={(e) => setTxInput(e.target.value)}
-                placeholder="Optional: Enter NOWPayments Payment ID / TX Hash"
-                className="w-full rounded-xl bg-[#0A0D14] border border-[#1E2536] px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 font-mono focus:border-blue-500 focus:outline-none transition-colors"
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono uppercase tracking-wider text-zinc-300 font-bold mb-1.5 flex items-center justify-between">
+                  <span>NOWPayments Payment ID or TX Hash <span className="text-rose-400">*</span></span>
+                  <span className="text-[10px] text-zinc-500 lowercase">Required for verification</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={txInput}
+                    onChange={(e) => {
+                      setTxInput(e.target.value);
+                      if (verificationResult.status !== 'idle') {
+                        setVerificationResult({ status: 'idle', message: '' });
+                      }
+                    }}
+                    placeholder="Enter NOWPayments Payment ID or TX Hash (Required)"
+                    className={`w-full rounded-xl bg-[#0A0D14] border px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 font-mono focus:outline-none transition-colors ${
+                      verificationResult.status === 'failed'
+                        ? 'border-rose-500/70 focus:border-rose-400 ring-1 ring-rose-500/30'
+                        : verificationResult.status === 'success'
+                        ? 'border-emerald-500/70 focus:border-emerald-400 ring-1 ring-emerald-500/30'
+                        : 'border-[#1E2536] focus:border-blue-500'
+                    }`}
+                  />
+                  {txInput.trim().length >= 6 && verificationResult.status === 'idle' && (
+                    <span className="absolute right-3 top-2.5 text-emerald-400">
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                </div>
+              </div>
 
-              {errorMsg && (
-                <div className="text-xs text-red-400 font-mono flex items-center space-x-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  <span>{errorMsg}</span>
+              {/* Verification Outcome: Not verified */}
+              {verificationResult.status === 'failed' && (
+                <div className="p-3.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 space-y-1 animate-in fade-in duration-150">
+                  <div className="flex items-center space-x-2 text-rose-400 font-bold text-xs">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>Not verified</span>
+                  </div>
+                  <p className="text-[11px] text-rose-300/90 leading-relaxed font-sans pl-6">
+                    {verificationResult.detail ||
+                      'The provided reference could not be verified on NOWPayments invoice #5836437268. Please ensure you completed payment and entered the exact Payment ID or transaction hash.'}
+                  </p>
                 </div>
               )}
 
-              {activationSuccess ? (
-                <div className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-lg shadow-emerald-600/30">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Subscription Active! Launching Terminal...</span>
+              {/* Verification Outcome: Payment successful */}
+              {verificationResult.status === 'success' && (
+                <div className="p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-100 space-y-1 animate-in fade-in duration-150">
+                  <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>Payment successful</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-200 leading-relaxed font-sans pl-6">
+                    {verificationResult.detail ||
+                      'Your $100 monthly subscription has been verified. 30-Day Institutional License has been provisioned. Launching Terminal...'}
+                  </p>
                 </div>
-              ) : (
+              )}
+
+              {/* Primary Action Button */}
+              {verificationResult.status !== 'success' && (
                 <button
                   type="button"
-                  onClick={handleConfirmPayment}
-                  disabled={isActivating}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-emerald-600/25 transition-all active:scale-[0.99] disabled:opacity-50"
+                  onClick={handleVerifyAndActivate}
+                  disabled={isVerifying}
+                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs tracking-wide shadow-lg shadow-emerald-600/25 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
                 >
-                  {isActivating ? (
+                  {isVerifying ? (
                     <>
                       <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>Verifying Payment & Provisioning Access...</span>
+                      <span>Verifying Payment with NOWPayments...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>I Have Completed Payment — Activate Terminal</span>
+                      <span>I Have Paid — Verify & Activate Terminal</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}

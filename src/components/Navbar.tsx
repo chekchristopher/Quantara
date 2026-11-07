@@ -5,6 +5,7 @@ import {
   Bell,
   BookOpen,
   Brain,
+  Check,
   CheckCircle,
   ChevronRight,
   Cpu,
@@ -384,8 +385,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* NOWPayments Subscription Button */}
-            {!isSubscribed ? (
+            {/* NOWPayments Subscription CTA Button (Visible ONLY when unsubscribed) */}
+            {!isSubscribed && (
               <button
                 type="button"
                 onClick={() => openPaywall('navbar_cta')}
@@ -395,17 +396,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Lock className="h-3.5 w-3.5 text-amber-400" />
                 <span className="hidden xs:inline">Subscribe</span>
                 <span className="text-[11px] text-amber-400">($100/mo)</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openPaywall('navbar_active_status')}
-                className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-mono text-xs font-semibold transition-all shadow-sm"
-                title={`Terminal License Active (${isAdmin ? 'Admin VIP Pass' : `${daysRemaining} days remaining`}). Click to manage subscription.`}
-              >
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">License:</span>
-                <span className="font-bold">{isAdmin ? 'VIP Pass' : `${daysRemaining}d`}</span>
               </button>
             )}
 
@@ -423,18 +413,31 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 {user ? (
                   <>
-                    <div className="h-6 w-6 rounded-full bg-blue-500/20 border border-blue-400/50 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300 overflow-hidden shrink-0 shadow-sm ring-1 ring-blue-500/30">
-                      {profile?.photoURL || user.photoURL ? (
-                        <img
-                          src={profile?.photoURL || user.photoURL}
-                          alt={profile?.displayName || 'Profile'}
-                          className="h-full w-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        (profile?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()
+                    <div className="relative shrink-0">
+                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-blue-500/20 border border-blue-400/50 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300 overflow-hidden shadow-sm ring-1 ring-blue-500/30">
+                        {profile?.photoURL || user.photoURL ? (
+                          <img
+                            src={profile?.photoURL || user.photoURL}
+                            alt={profile?.displayName || 'Profile'}
+                            className="h-full w-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          (profile?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()
+                        )}
+                      </div>
+
+                      {/* Green Tick for Licensed Users */}
+                      {isSubscribed && (
+                        <span
+                          className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-black shadow-md ring-1.5 ring-[#0A0D14]"
+                          title={isAdmin ? "Verified Institutional Admin (Licensed)" : `Verified License (${daysRemaining}d remaining)`}
+                        >
+                          <Check className="h-2.5 w-2.5 text-black stroke-[3.5]" />
+                        </span>
                       )}
                     </div>
+
                     <span className="hidden sm:inline font-mono text-[11px] font-semibold text-zinc-200 max-w-[110px] truncate">
                       {profile?.displayName || user.displayName || user.email?.split('@')[0]}
                     </span>
@@ -444,6 +447,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 ) : (
                   <>
+                    <div className="relative shrink-0">
+                      <div className="h-6 w-6 rounded-full bg-blue-500/20 border border-blue-400/50 flex items-center justify-center font-mono text-[10px] font-bold text-blue-300">
+                        <User className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
                     {/* Google G Icon */}
                     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24">
                       <path

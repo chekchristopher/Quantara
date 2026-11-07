@@ -870,7 +870,7 @@ function QuantaraApp() {
       />
 
       {/* NOWPayments Subscription & 30-Day Paywall Modal */}
-      <SubscriptionPaymentModal />
+      <SubscriptionPaymentModal onOpenAuthModal={() => setIsAuthModalOpen(true)} />
 
       {/* Real-time Toast Notifications with Web Audio Chimes */}
       <ToastNotificationCenter

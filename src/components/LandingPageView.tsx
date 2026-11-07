@@ -43,6 +43,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const { isSubscribed, openPaywall } = useSubscription();
 
   const handleLaunchTerminal = (targetTab: string = 'dashboard') => {
+    if (!user) {
+      onOpenAuthModal();
+      return;
+    }
     if (isSubscribed) {
       onNavigateTab(targetTab);
     } else {
@@ -849,11 +853,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => openPaywall('landing_pricing')}
-                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center space-x-1.5"
+                onClick={() => {
+                  if (!user) {
+                    onOpenAuthModal();
+                  } else {
+                    openPaywall('landing_pricing');
+                  }
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>I Have Paid / Enter Payment ID</span>
+                <span>{user ? 'I Have Paid — Verify Payment' : 'Sign In & Subscribe ($100/mo)'}</span>
               </button>
 
               <a

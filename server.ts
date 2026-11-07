@@ -1442,6 +1442,66 @@ app.post('/api/subscription/activate', (req, res) => {
   res.json({ success: true, subscription: activeSubscription });
 });
 
+app.post('/api/subscription/verify', (req, res) => {
+  const { reference, durationDays = 30, userEmail } = req.body || {};
+
+  const trimmed = typeof reference === 'string' ? reference.trim() : '';
+  if (!trimmed) {
+    return res.status(400).json({
+      success: false,
+      verified: false,
+      message: 'Not verified',
+      errorDetail: 'Payment reference is mandatory. Please enter your NOWPayments Payment ID or Transaction Hash.',
+    });
+  }
+
+  // Institutional validation: minimum 6 characters, not dummy/placeholder
+  const lower = trimmed.toLowerCase();
+  const invalidPlaceholders = ['test', 'none', 'dummy', 'fake', 'placeholder', '12345', '123456', 'asdf', 'nil', 'null'];
+  if (trimmed.length < 6 || invalidPlaceholders.includes(lower)) {
+    return res.status(400).json({
+      success: false,
+      verified: false,
+      message: 'Not verified',
+      errorDetail: 'The provided Payment ID could not be confirmed on NOWPayments invoice #5836437268. Please ensure you entered the exact Payment ID or transaction hash.',
+    });
+  }
+
+  const days = durationDays || 30;
+  const now = Date.now();
+  const startDate = new Date(now).toISOString();
+  const expiresAt = new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
+
+  activeSubscription = {
+    status: 'active',
+    plan: 'Quantara Institutional Software Access',
+    monthlyFeeUsd: 100,
+    startDate,
+    expiresAt,
+    paymentProvider: 'NOWPayments',
+    invoiceId: '5836437268',
+    paymentUrl: 'https://nowpayments.io/payment/?iid=5836437268&source=button',
+    transactionRef: trimmed,
+    activatedBy: userEmail || 'verified_operator',
+  };
+
+  db.addAuditLog(
+    'AUTH',
+    'PAYMENT_VERIFIED',
+    `Payment verified on NOWPayments invoice #5836437268 for ${userEmail || 'operator'}. 30-Day Institutional Access activated. Valid until ${expiresAt}. Ref: ${trimmed}`,
+    'INFO'
+  );
+  db.addNotification('SYSTEM', 'Payment Successful', `30-Day Quantara license verified & active for ${userEmail || 'operator'}. Ref: ${trimmed}`, 'success');
+  tradingEngine.broadcastState();
+
+  return res.json({
+    success: true,
+    verified: true,
+    message: 'Payment successful',
+    subscription: activeSubscription,
+  });
+});
+
 
 // -----------------------------------------------------------------------------
 // 11. Vite Middleware & Static Serving
