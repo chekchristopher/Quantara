@@ -20,10 +20,12 @@ import {
   User,
   X,
   Zap,
+  Lock,
 } from 'lucide-react';
 import { BotState, NotificationItem, OfflineSessionStats, RiskSettings } from '../types';
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
@@ -96,19 +98,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const isAdmin = Boolean(profile?.role === 'admin' || user?.email === 'chekchris85@gmail.com');
+  const { isSubscribed, daysRemaining, openPaywall } = useSubscription();
 
   const navItems: NavItem[] = [
-    ...(!user
-      ? [
-          {
-            id: 'landing',
-            label: 'Platform Overview',
-            desc: 'System architecture, performance & strategy highlights',
-            category: 'Platform',
-            icon: Sparkles,
-          },
-        ]
-      : []),
+    {
+      id: 'landing',
+      label: 'Platform Overview',
+      desc: 'System architecture, performance & $100/mo NOWPayments subscription',
+      category: 'Platform',
+      icon: Sparkles,
+    },
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -193,6 +192,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   const handleSelectNav = (tabId: string) => {
+    if (tabId !== 'landing' && !isSubscribed) {
+      openPaywall(`navbar_${tabId}`);
+      setMenuOpen(false);
+      return;
+    }
     onSelectTab(tabId);
     setMenuOpen(false);
   };
@@ -237,9 +241,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Brand Logo & Name */}
             <button
-              onClick={() => onSelectTab(user ? 'dashboard' : currentTab === 'landing' ? 'dashboard' : 'landing')}
+              onClick={() => onSelectTab(isSubscribed ? 'dashboard' : 'landing')}
               className="flex items-center space-x-2 sm:space-x-3 text-left group transition-opacity hover:opacity-90 cursor-pointer"
-              title={user ? 'Quantara Institutional Trading' : 'Click to toggle Platform Overview'}
+              title={isSubscribed ? 'Quantara Institutional Trading Dashboard' : 'Quantara Platform Overview'}
             >
               <QuantaraLogoMark size="sm" />
               <div>
@@ -379,6 +383,31 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
             </div>
+
+            {/* NOWPayments Subscription Button */}
+            {!isSubscribed ? (
+              <button
+                type="button"
+                onClick={() => openPaywall('navbar_cta')}
+                className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-mono text-xs font-bold transition-all shadow-sm active:scale-[0.98]"
+                title="Subscribe to Quantara ($100/mo via NOWPayments)"
+              >
+                <Lock className="h-3.5 w-3.5 text-amber-400" />
+                <span className="hidden xs:inline">Subscribe</span>
+                <span className="text-[11px] text-amber-400">($100/mo)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openPaywall('navbar_active_status')}
+                className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-mono text-xs font-semibold transition-all shadow-sm"
+                title={`Terminal License Active (${isAdmin ? 'Admin VIP Pass' : `${daysRemaining} days remaining`}). Click to manage subscription.`}
+              >
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">License:</span>
+                <span className="font-bold">{isAdmin ? 'VIP Pass' : `${daysRemaining}d`}</span>
+              </button>
+            )}
 
             {/* Enterprise Auth & Account Profile Button */}
             {onOpenAuthModal && (
@@ -574,6 +603,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                                   <span className="text-xs sm:text-sm font-semibold truncate text-white group-hover:text-blue-200 transition-colors">
                                     {item.label}
                                   </span>
+                                  {!isSubscribed && item.id !== 'landing' && (
+                                    <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                                      <Lock className="h-2.5 w-2.5" />
+                                      <span>$100/mo</span>
+                                    </span>
+                                  )}
                                   {isActive && (
                                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
                                   )}

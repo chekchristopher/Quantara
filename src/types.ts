@@ -702,3 +702,20 @@ export interface SystemHealth {
   ordersProcessedTotal: number;
   circuitBreakerTripped: boolean;
 }
+
+export type SubscriptionStatus = 'active' | 'expired' | 'unpaid';
+
+export interface UserSubscription {
+  status: SubscriptionStatus;
+  plan: string;
+  monthlyFeeUsd: number;
+  startDate: string;
+  expiresAt: string;
+  paymentProvider: 'NOWPayments';
+  invoiceId: string;
+  paymentUrl: string;
+  transactionRef?: string;
+  isAutoRenew?: boolean;
+  activatedBy?: string;
+}
+

@@ -48,6 +48,10 @@ service cloud.firestore {
         (!('emailVerified' in data) || data.emailVerified is bool) &&
         (!('bio' in data) || (data.bio is string && data.bio.size() <= 1024)) &&
         (!('desk' in data) || (data.desk is string && data.desk.size() <= 128)) &&
+        (!('subscriptionStatus' in data) || (data.subscriptionStatus is string && data.subscriptionStatus in ['active', 'expired', 'unpaid'])) &&
+        (!('subscriptionPlan' in data) || (data.subscriptionPlan is string && data.subscriptionPlan.size() <= 128)) &&
+        (!('subscriptionExpiresAt' in data) || (data.subscriptionExpiresAt is string && data.subscriptionExpiresAt.size() <= 64)) &&
+        (!('subscriptionPaymentId' in data) || (data.subscriptionPaymentId is string && data.subscriptionPaymentId.size() <= 128)) &&
         data.createdAt is string && data.createdAt.size() <= 64 &&
         data.updatedAt is string && data.updatedAt.size() <= 64;
     }

@@ -25,6 +25,10 @@ export interface UserProfileDoc {
   desk?: string;
   role: 'operator' | 'senior_analyst' | 'risk_officer' | 'admin';
   enterpriseTier: 'Standard' | 'Institutional Pro' | 'Enterprise Dedicated';
+  subscriptionStatus?: 'active' | 'expired' | 'unpaid';
+  subscriptionPlan?: string;
+  subscriptionExpiresAt?: string;
+  subscriptionPaymentId?: string;
   emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
@@ -203,7 +207,30 @@ export const firestoreSync = {
     }
   },
 
-  // Save Risk Settings to Firestore
+  // Update Subscription License Data in Firestore
+  async updateSubscription(
+    userId: string,
+    data: {
+      subscriptionStatus?: 'active' | 'expired' | 'unpaid';
+      subscriptionPlan?: string;
+      subscriptionExpiresAt?: string;
+      subscriptionPaymentId?: string;
+    }
+  ): Promise<void> {
+    const userDocRef = doc(db, 'users', userId);
+    const path = `users/${userId}`;
+    const now = new Date().toISOString();
+    try {
+      await setDoc(userDocRef, { ...data, updatedAt: now }, { merge: true });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('client is offline')) {
+        setDoc(userDocRef, { ...data, updatedAt: now }, { merge: true }).catch(() => {});
+        return;
+      }
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
   async saveRiskSettings(userId: string, settings: RiskSettings): Promise<void> {
     const path = `users/${userId}/settings/risk`;
     const settingsDocRef = doc(db, 'users', userId, 'settings', 'risk');

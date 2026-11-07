@@ -13,6 +13,10 @@
         "desk": { "type": "string", "maxLength": 128 },
         "role": { "type": "string", "enum": ["operator", "senior_analyst", "risk_officer", "admin"] },
         "enterpriseTier": { "type": "string", "enum": ["Standard", "Institutional Pro", "Enterprise Dedicated"] },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "expired", "unpaid"] },
+        "subscriptionPlan": { "type": "string", "maxLength": 128 },
+        "subscriptionExpiresAt": { "type": "string", "maxLength": 64 },
+        "subscriptionPaymentId": { "type": "string", "maxLength": 128 },
         "emailVerified": { "type": "boolean" },
         "createdAt": { "type": "string", "maxLength": 64 },
         "updatedAt": { "type": "string", "maxLength": 64 }

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
 
 interface LandingPageViewProps {
   onNavigateTab: (tab: string) => void;
@@ -39,6 +40,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onOpenAuthModal,
 }) => {
   const { user } = useAuth();
+  const { isSubscribed, openPaywall } = useSubscription();
+
+  const handleLaunchTerminal = (targetTab: string = 'dashboard') => {
+    if (isSubscribed) {
+      onNavigateTab(targetTab);
+    } else {
+      openPaywall('terminal_launch');
+    }
+  };
 
   // Selected strategy for interactive regime simulator
   const [selectedStrategy, setSelectedStrategy] = useState<number>(0);
@@ -144,16 +154,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           {/* Primary Action Buttons */}
           <div className="pt-2 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm font-semibold max-w-xl sm:max-w-none mx-auto">
             <button
-              onClick={() => onNavigateTab('dashboard')}
+              onClick={() => handleLaunchTerminal('dashboard')}
               className="flex items-center justify-center space-x-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-xl shadow-blue-600/25 transition-all active:scale-[0.98] font-bold"
             >
-              <Play className="h-4 w-4 fill-white" />
+              {!isSubscribed ? <Lock className="h-4 w-4" /> : <Play className="h-4 w-4 fill-white" />}
               <span>Launch Trading Terminal</span>
               <ArrowRight className="h-4 w-4" />
             </button>
 
             <button
-              onClick={() => onNavigateTab('brokers')}
+              onClick={() => handleLaunchTerminal('brokers')}
               className="flex items-center justify-center space-x-2 px-5 py-3.5 rounded-xl border border-[#2B3142] bg-[#121520] hover:bg-[#1A1F30] hover:border-blue-500/40 text-zinc-200 transition-all active:scale-[0.98]"
             >
               <Database className="h-4 w-4 text-blue-400" />
@@ -749,7 +759,118 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
       </section>
 
-      {/* 8. Call To Action Footer Banner */}
+      {/* 8. Institutional Subscription & NOWPayments Crypto Pricing Section */}
+      <section className="max-w-5xl mx-auto rounded-2xl border border-blue-500/30 bg-[#0E121B] p-6 sm:p-10 shadow-2xl space-y-8 relative overflow-hidden">
+        <div className="text-center max-w-2xl mx-auto space-y-3">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-xs font-mono font-bold text-emerald-400">
+            <Shield className="h-3.5 w-3.5" />
+            <span>NOWPAYMENTS CRYPTO SUBSCRIPTION</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+            Transparent Monthly Software Access
+          </h2>
+
+          <p className="text-xs sm:text-sm text-[#9499A8] leading-relaxed">
+            Unlock the full autonomous trading terminal, multi-broker MT5 gateway, strategy lab, and deterministic risk suite.
+            Fixed fee of $100 per month. Once 1 month concludes, subscribe again to maintain uninterrupted server execution.
+          </p>
+        </div>
+
+        {/* Pricing Plan Card */}
+        <div className="max-w-xl mx-auto rounded-xl border border-blue-500/40 bg-[#121624] p-6 sm:p-7 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-[#1E2536] gap-3">
+            <div>
+              <span className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider">
+                Institutional License
+              </span>
+              <div className="flex items-baseline space-x-2 mt-1">
+                <span className="text-4xl font-extrabold text-white tracking-tight">$100</span>
+                <span className="text-xs font-mono text-[#8E9299]">USD / Month</span>
+              </div>
+            </div>
+
+            <div className="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center space-x-1.5 self-start sm:self-center">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>30-Day Renewable Pass</span>
+            </div>
+          </div>
+
+          {/* Core Plan Perks */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>24/7 Autonomous Server Loop</span>
+            </div>
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>MetaTrader 5 Real & Demo Gateway</span>
+            </div>
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>All 4 Quantitative Strategy Models</span>
+            </div>
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>Dynamic ATR Volatility Sizing</span>
+            </div>
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>Cloud Journal & Psychology Audit</span>
+            </div>
+            <div className="flex items-center space-x-2 text-zinc-300">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>Emergency Circuit Breakers</span>
+            </div>
+          </div>
+
+          {/* NOWPayments Embed Area */}
+          <div className="p-4 rounded-xl bg-[#0A0D14] border border-[#1E2536] text-center space-y-3">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#8E9299] block">
+              Pay $100 via NOWPayments (BTC, USDT, ETH, SOL, etc.)
+            </span>
+
+            <div className="flex items-center justify-center">
+              <a
+                href="https://nowpayments.io/payment/?iid=5836437268&source=button"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="transition-transform hover:scale-105 active:scale-95 shadow-xl rounded-xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 inline-block"
+                title="Cryptocurrency & Bitcoin payment button by NOWPayments"
+              >
+                <img
+                  src="https://nowpayments.io/images/embeds/payments-button-white.svg"
+                  alt="Cryptocurrency & Bitcoin payment button by NOWPayments"
+                  className="h-11 sm:h-12 w-auto object-contain"
+                />
+              </a>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => openPaywall('landing_pricing')}
+                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center space-x-1.5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>I Have Paid / Enter Payment ID</span>
+              </button>
+
+              <a
+                href="https://nowpayments.io/payment/?iid=5836437268&source=button"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-xs text-blue-400 hover:text-blue-300 underline font-mono flex items-center space-x-1"
+              >
+                <span>Direct NOWPayments Link</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. Call To Action Footer Banner */}
       <section className="max-w-4xl mx-auto text-center space-y-6 rounded-2xl border border-blue-500/30 bg-gradient-to-b from-blue-950/30 to-[#0A0D14] p-8 sm:p-12 shadow-2xl relative overflow-hidden">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/20 text-xs font-mono font-bold text-blue-300">
           <QuantaraLogoMark size="sm" showGlow={false} className="w-4 h-4" />
@@ -767,9 +888,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-2 text-xs sm:text-sm font-semibold max-w-md sm:max-w-none mx-auto">
           <button
-            onClick={() => onNavigateTab('dashboard')}
+            onClick={() => handleLaunchTerminal('dashboard')}
             className="flex items-center justify-center space-x-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-600/30 transition-all active:scale-[0.98]"
           >
+            {!isSubscribed ? <Lock className="h-4 w-4" /> : null}
             <span>Open Quantara Terminal</span>
             <ArrowRight className="h-4 w-4" />
           </button>

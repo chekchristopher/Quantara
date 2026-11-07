@@ -21,8 +21,10 @@ import { MarketTickerRibbon } from './components/MarketTickerRibbon';
 import { FloatingSafetyDock } from './components/FloatingSafetyDock';
 import { ToastNotificationCenter } from './components/ToastNotificationCenter';
 import { PerformanceStatementModal } from './components/PerformanceStatementModal';
+import { SubscriptionPaymentModal } from './components/SubscriptionPaymentModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
 import { firestoreSync } from './services/firestoreSync';
 import { QuantaraLogoMark } from './components/QuantaraLogo';
 import { api, SnapshotData } from './services/api';
@@ -47,25 +49,34 @@ import {
 function QuantaraApp() {
   const { user, profile, cloudSyncStatus } = useAuth();
   const { isDark } = useTheme();
+  const { isSubscribed, openPaywall } = useSubscription();
   const [currentTab, setCurrentTab] = useState<string>('landing');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // Security Clearance Gate for Administrative Features
   const isAdmin = Boolean(profile?.role === 'admin' || user?.email === 'chekchris85@gmail.com');
 
-  // Automatically switch away from landing page when a user signs in (landing page is only visible to guests who are not signed in)
+  // Automatically switch to dashboard ONLY if user is SUBSCRIBED
   useEffect(() => {
-    if (user && currentTab === 'landing') {
+    if (isSubscribed && user && currentTab === 'landing') {
       setCurrentTab('dashboard');
     }
-  }, [user, currentTab]);
+  }, [isSubscribed, user, currentTab]);
+
+  // Security Paywall Gate: Non-subscribed users can view ONLY the landing page
+  useEffect(() => {
+    if (!isSubscribed && currentTab !== 'landing') {
+      setCurrentTab('landing');
+      openPaywall('terminal_gate');
+    }
+  }, [isSubscribed, currentTab, openPaywall]);
 
   // Security Guard: Prevent non-admins from accessing the admin telemetry tab
   useEffect(() => {
     if (currentTab === 'admin' && !isAdmin) {
-      setCurrentTab('dashboard');
+      setCurrentTab(isSubscribed ? 'dashboard' : 'landing');
     }
-  }, [currentTab, isAdmin]);
+  }, [currentTab, isAdmin, isSubscribed]);
 
   // Core Application State
   const [botState, setBotState] = useState<BotState>({
@@ -636,16 +647,22 @@ function QuantaraApp() {
 
       {/* Main View Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 pb-32 md:pb-20 space-y-6">
-        {/* Landing Page: strictly visible only when NOT signed in */}
-        {!user && currentTab === 'landing' && (
+        {/* Landing Page: The ONLY view accessible to non-subscribed users */}
+        {(currentTab === 'landing' || !isSubscribed) && (
           <LandingPageView
-            onNavigateTab={setCurrentTab}
+            onNavigateTab={(targetTab) => {
+              if (isSubscribed) {
+                setCurrentTab(targetTab);
+              } else {
+                openPaywall('landing_tab_navigation');
+              }
+            }}
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
           />
         )}
 
-        {/* Dashboard / Institutional Terminal (Default home view once signed in) */}
-        {(currentTab === 'dashboard' || (user && currentTab === 'landing')) && (
+        {/* Dashboard / Institutional Terminal (Visible strictly when subscribed) */}
+        {isSubscribed && currentTab === 'dashboard' && (
           <DashboardView
             portfolio={portfolio}
             botState={botState}
@@ -852,14 +869,17 @@ function QuantaraApp() {
         brokerAccounts={brokerAccounts}
       />
 
+      {/* NOWPayments Subscription & 30-Day Paywall Modal */}
+      <SubscriptionPaymentModal />
+
       {/* Real-time Toast Notifications with Web Audio Chimes */}
       <ToastNotificationCenter
         notifications={notifications}
         positions={positions}
       />
 
-      {/* Persistent Floating Emergency Safety Dock */}
-      {(currentTab !== 'landing' || user) && (
+      {/* Persistent Floating Emergency Safety Dock (Strictly when subscribed & inside terminal) */}
+      {isSubscribed && currentTab !== 'landing' && (
         <FloatingSafetyDock
           portfolio={portfolio}
           botState={botState}
@@ -899,80 +919,76 @@ function QuantaraApp() {
 
       {/* Mobile Sticky Bottom Navigation Dock (md:hidden) */}
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-[#0E0E11]/95 backdrop-blur-lg border-t border-[#1F1F23] md:hidden px-1.5 py-1.5 flex items-center justify-around text-[10px] font-mono shadow-2xl safe-area-bottom">
-        {!user && (
-          <button
-            type="button"
-            onClick={() => setCurrentTab('landing')}
-            className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
-              currentTab === 'landing' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
-            }`}
-          >
-            <Sparkles className="h-4 w-4 mb-0.5" />
-            <span className="truncate">Overview</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setCurrentTab('landing')}
+          className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
+            currentTab === 'landing' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
+          }`}
+        >
+          <Sparkles className="h-4 w-4 mb-0.5" />
+          <span className="truncate">Overview</span>
+        </button>
 
         <button
           type="button"
-          onClick={() => setCurrentTab('dashboard')}
+          onClick={() => isSubscribed ? setCurrentTab('dashboard') : openPaywall('mobile_dock_terminal')}
           className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
             currentTab === 'dashboard' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
           }`}
         >
-          <Activity className="h-4 w-4 mb-0.5" />
+          <div className="relative">
+            <Activity className="h-4 w-4 mb-0.5" />
+            {!isSubscribed && <Lock className="h-2.5 w-2.5 absolute -top-1 -right-2 text-amber-400" />}
+          </div>
           <span className="truncate">Terminal</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setCurrentTab('brokers')}
+          onClick={() => isSubscribed ? setCurrentTab('brokers') : openPaywall('mobile_dock_brokers')}
           className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors relative ${
             currentTab === 'brokers' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
           }`}
         >
           <div className="relative">
             <Database className="h-4 w-4 mb-0.5" />
-            {brokerAccounts.some((b) => b.serverStatus === 'RUNNING' || b.status === 'RUNNING' || b.status === 'CONNECTED') && (
+            {!isSubscribed ? (
+              <Lock className="h-2.5 w-2.5 absolute -top-1 -right-2 text-amber-400" />
+            ) : brokerAccounts.some((b) => b.serverStatus === 'RUNNING' || b.status === 'RUNNING' || b.status === 'CONNECTED') ? (
               <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0E0E11] animate-pulse" />
-            )}
+            ) : null}
           </div>
-          <span className="truncate">MT5 / Brokers</span>
+          <span className="truncate">MT5</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setCurrentTab('journal')}
+          onClick={() => isSubscribed ? setCurrentTab('journal') : openPaywall('mobile_dock_journal')}
           className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
             currentTab === 'journal' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
           }`}
         >
-          <Brain className="h-4 w-4 mb-0.5" />
+          <div className="relative">
+            <Brain className="h-4 w-4 mb-0.5" />
+            {!isSubscribed && <Lock className="h-2.5 w-2.5 absolute -top-1 -right-2 text-amber-400" />}
+          </div>
           <span className="truncate">Journal</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setCurrentTab('compounding')}
+          onClick={() => isSubscribed ? setCurrentTab('compounding') : openPaywall('mobile_dock_compounding')}
           className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
             currentTab === 'compounding' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
           }`}
         >
-          <TrendingUp className="h-4 w-4 mb-0.5" />
-          <span className="truncate">$10 Wealth</span>
+          <div className="relative">
+            <TrendingUp className="h-4 w-4 mb-0.5" />
+            {!isSubscribed && <Lock className="h-2.5 w-2.5 absolute -top-1 -right-2 text-amber-400" />}
+          </div>
+          <span className="truncate">$10 Lab</span>
         </button>
-
-        {user && (
-          <button
-            type="button"
-            onClick={() => setCurrentTab('engine')}
-            className={`flex-1 flex flex-col items-center py-1 px-1 rounded-lg transition-colors ${
-              currentTab === 'engine' ? 'text-blue-400 font-bold' : 'text-[#8E9299] hover:text-white'
-            }`}
-          >
-            <Zap className="h-4 w-4 mb-0.5" />
-            <span className="truncate">Engine</span>
-          </button>
-        )}
 
         <button
           type="button"
@@ -992,7 +1008,7 @@ function QuantaraApp() {
               <User className="h-2.5 w-2.5" />
             )}
           </div>
-          <span className="truncate">Profile</span>
+          <span className="truncate">Account</span>
         </button>
       </nav>
     </div>
@@ -1003,7 +1019,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <QuantaraApp />
+        <SubscriptionProvider>
+          <QuantaraApp />
+        </SubscriptionProvider>
       </AuthProvider>
     </ThemeProvider>
   );

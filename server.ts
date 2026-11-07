@@ -1384,6 +1384,66 @@ app.post('/api/offline-report/dismiss', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// 10.2 NOWPayments Crypto Subscription API ($100/Month)
+// -----------------------------------------------------------------------------
+let activeSubscription = {
+  status: 'unpaid',
+  plan: 'Quantara Institutional Software Access',
+  monthlyFeeUsd: 100,
+  startDate: '',
+  expiresAt: '',
+  paymentProvider: 'NOWPayments',
+  invoiceId: '5836437268',
+  paymentUrl: 'https://nowpayments.io/payment/?iid=5836437268&source=button',
+  transactionRef: '',
+  activatedBy: '',
+};
+
+app.get('/api/subscription/status', (req, res) => {
+  const isTimeValid = Boolean(
+    activeSubscription.status === 'active' &&
+    activeSubscription.expiresAt &&
+    new Date(activeSubscription.expiresAt).getTime() > Date.now()
+  );
+
+  res.json({
+    ...activeSubscription,
+    isSubscribed: isTimeValid,
+    daysRemaining: activeSubscription.expiresAt
+      ? Math.max(0, Math.ceil((new Date(activeSubscription.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : 0,
+  });
+});
+
+app.post('/api/subscription/activate', (req, res) => {
+  const { transactionRef, durationDays } = req.body;
+  const days = durationDays || 30;
+  const now = Date.now();
+  const startDate = new Date(now).toISOString();
+  const expiresAt = new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
+
+  activeSubscription = {
+    status: 'active',
+    plan: 'Quantara Institutional Software Access',
+    monthlyFeeUsd: 100,
+    startDate,
+    expiresAt,
+    paymentProvider: 'NOWPayments',
+    invoiceId: '5836437268',
+    paymentUrl: 'https://nowpayments.io/payment/?iid=5836437268&source=button',
+    transactionRef: transactionRef || `nowpay_${Math.floor(Math.random() * 899999 + 100000)}`,
+    activatedBy: 'operator',
+  };
+
+  db.addAuditLog('AUTH', 'SUBSCRIPTION_ACTIVATED', `30-Day Terminal Access activated ($100/mo) via NOWPayments. Valid until ${expiresAt}. Ref: ${activeSubscription.transactionRef}`, 'INFO');
+  db.addNotification('SYSTEM', 'Subscription Active', '30-day Quantara Institutional license activated via NOWPayments.', 'success');
+  tradingEngine.broadcastState();
+
+  res.json({ success: true, subscription: activeSubscription });
+});
+
+
+// -----------------------------------------------------------------------------
 // 11. Vite Middleware & Static Serving
 // -----------------------------------------------------------------------------
 async function initServer() {
