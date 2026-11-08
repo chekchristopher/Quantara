@@ -256,9 +256,10 @@ export const api = {
     return res.json();
   },
 
-  // Brokers & MT5
-  async getBrokerAccounts(): Promise<BrokerAccount[]> {
-    const res = await fetch('/api/brokers');
+  // Brokers & MT5 (Scoped strictly per user for zero-leakage security)
+  async getBrokerAccounts(userId?: string): Promise<BrokerAccount[]> {
+    const url = userId ? `/api/brokers?userId=${encodeURIComponent(userId)}` : '/api/brokers';
+    const res = await fetch(url);
     return res.json();
   },
 
@@ -274,6 +275,8 @@ export const api = {
     currency?: string;
     balance?: number;
     autoTradeControl?: any;
+    userId?: string;
+    userEmail?: string;
   }): Promise<{ success: boolean; account: BrokerAccount; pingMs: number; message: string }> {
     const res = await fetch('/api/brokers/mt5/login', {
       method: 'POST',
@@ -316,6 +319,8 @@ export const api = {
     leverage?: string;
     accountName?: string;
     customName?: string;
+    userId?: string;
+    userEmail?: string;
   }): Promise<any> {
     const res = await fetch('/api/brokers/connect', {
       method: 'POST',
@@ -325,50 +330,56 @@ export const api = {
     return res.json();
   },
 
-  async disconnectBroker(id: string): Promise<any> {
-    const res = await fetch(`/api/brokers/${id}`, { method: 'DELETE' });
+  async disconnectBroker(id: string, userId?: string): Promise<any> {
+    const url = userId ? `/api/brokers/${id}?userId=${encodeURIComponent(userId)}` : `/api/brokers/${id}`;
+    const res = await fetch(url, { method: 'DELETE' });
     return res.json();
   },
 
-  async selectActiveBroker(accountId: string): Promise<{ success: boolean; activeAccount: BrokerAccount; botState: BotState }> {
+  async selectActiveBroker(accountId: string, userId?: string): Promise<{ success: boolean; activeAccount: BrokerAccount; botState: BotState }> {
     const res = await fetch('/api/brokers/select-active', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId }),
+      body: JSON.stringify({ accountId, userId }),
     });
     return res.json();
   },
 
-  async pauseBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
-    const res = await fetch(`/api/brokers/${id}/pause-server`, { method: 'POST' });
+  async pauseBrokerServer(id: string, userId?: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const url = userId ? `/api/brokers/${id}/pause-server?userId=${encodeURIComponent(userId)}` : `/api/brokers/${id}/pause-server`;
+    const res = await fetch(url, { method: 'POST' });
     return res.json();
   },
 
-  async resumeBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
-    const res = await fetch(`/api/brokers/${id}/resume-server`, { method: 'POST' });
+  async resumeBrokerServer(id: string, userId?: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const url = userId ? `/api/brokers/${id}/resume-server?userId=${encodeURIComponent(userId)}` : `/api/brokers/${id}/resume-server`;
+    const res = await fetch(url, { method: 'POST' });
     return res.json();
   },
 
-  async stopBrokerServer(id: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
-    const res = await fetch(`/api/brokers/${id}/stop-server`, { method: 'POST' });
+  async stopBrokerServer(id: string, userId?: string): Promise<{ success: boolean; account: BrokerAccount; botState: BotState }> {
+    const url = userId ? `/api/brokers/${id}/stop-server?userId=${encodeURIComponent(userId)}` : `/api/brokers/${id}/stop-server`;
+    const res = await fetch(url, { method: 'POST' });
     return res.json();
   },
 
-  async pauseAllServers(): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
-    const res = await fetch('/api/brokers/server/pause-all', { method: 'POST' });
+  async pauseAllServers(userId?: string): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
+    const url = userId ? `/api/brokers/server/pause-all?userId=${encodeURIComponent(userId)}` : `/api/brokers/server/pause-all`;
+    const res = await fetch(url, { method: 'POST' });
     return res.json();
   },
 
-  async runAllServersNonStop(): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
-    const res = await fetch('/api/brokers/server/run-all', { method: 'POST' });
+  async runAllServersNonStop(userId?: string): Promise<{ success: boolean; botState: BotState; brokerAccounts: BrokerAccount[] }> {
+    const url = userId ? `/api/brokers/server/run-all?userId=${encodeURIComponent(userId)}` : `/api/brokers/server/run-all`;
+    const res = await fetch(url, { method: 'POST' });
     return res.json();
   },
 
-  async syncBrokerAccounts(accounts: BrokerAccount[]): Promise<{ success: boolean; accounts: BrokerAccount[]; botState: BotState }> {
+  async syncBrokerAccounts(accounts: BrokerAccount[], userId?: string, userEmail?: string): Promise<{ success: boolean; accounts: BrokerAccount[]; botState: BotState }> {
     const res = await fetch('/api/brokers/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accounts }),
+      body: JSON.stringify({ accounts, userId, userEmail }),
     });
     return res.json();
   },

@@ -601,10 +601,16 @@ app.get('/api/economic/calendar', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 9. Broker Accounts & Exchange Connections (Including MetaTrader 5 Bridge)
+// 9. Broker Accounts & Exchange Connections (Strictly Scoped by User)
 // -----------------------------------------------------------------------------
 app.get('/api/brokers', (req, res) => {
-  res.json(db.brokerAccounts);
+  const userId = String(req.query.userId || '').trim();
+  if (!userId) {
+    // Unauthenticated or unscoped request: return empty to prevent data leakage
+    return res.json([]);
+  }
+  const userAccounts = db.brokerAccounts.filter((b) => b.userId === userId);
+  res.json(userAccounts);
 });
 
 app.post('/api/brokers/mt5/login', (req, res) => {
@@ -620,11 +626,16 @@ app.post('/api/brokers/mt5/login', (req, res) => {
     currency = 'USD',
     balance = 5000,
     autoTradeControl,
+    userId = '',
+    userEmail = '',
   } = req.body;
 
   if (!login || !server) {
     return res.status(400).json({ success: false, message: 'Server and Account Login are required.' });
   }
+
+  const cleanUserId = typeof userId === 'string' ? userId.trim() : '';
+  const cleanEmail = typeof userEmail === 'string' ? userEmail.trim() : '';
 
   const pingMs = Math.floor(9 + Math.random() * 15);
   const numBalance = Math.max(10, Number(balance) || 5000);
@@ -639,6 +650,8 @@ app.post('/api/brokers/mt5/login', (req, res) => {
 
   const newAccount: any = {
     id: `acc_mt5_${Date.now()}`,
+    userId: cleanUserId,
+    userEmail: cleanEmail,
     name: assignedName,
     broker: brokerName,
     server,
@@ -704,10 +717,22 @@ app.post('/api/brokers/mt5/login', (req, res) => {
     },
   };
 
-  // Mark all other accounts as inactive for takeover
-  db.brokerAccounts.forEach((b) => {
-    b.isActiveForTakeover = false;
-  });
+  // Only mark other accounts FOR THIS USER as inactive for takeover
+  if (cleanUserId) {
+    db.brokerAccounts
+      .filter((b) => b.userId === cleanUserId)
+      .forEach((b) => {
+        b.isActiveForTakeover = false;
+      });
+    // Remove previous instance of same server/accountNumber for this user
+    db.brokerAccounts = db.brokerAccounts.filter(
+      (b) => !(b.userId === cleanUserId && b.accountNumber === String(login) && b.server === server)
+    );
+  } else {
+    db.brokerAccounts.forEach((b) => {
+      b.isActiveForTakeover = false;
+    });
+  }
 
   // Prepend new account to list and persist to disk
   db.brokerAccounts.unshift(newAccount);
@@ -737,7 +762,7 @@ app.post('/api/brokers/mt5/login', (req, res) => {
   db.addAuditLog(
     'BROKER',
     'MT5_LOGIN_SUCCESSFUL',
-    `Authenticated to ${server} (Login: #${login}, Type: ${accountType}). Latency: ${pingMs}ms. Autonomous trading control ENGAGED.`,
+    `Authenticated to ${server} (Login: #${login}, Type: ${accountType}). Latency: ${pingMs}ms. Autonomous trading control ENGAGED. User: ${cleanEmail || cleanUserId || 'anonymous'}`,
     'INFO'
   );
   db.addNotification(
@@ -779,11 +804,15 @@ app.post('/api/brokers/mt5/close-all', (req, res) => {
 });
 
 app.post('/api/brokers/connect', (req, res) => {
-  const { broker, apiKey, isPaper, simulatedBalance, server, accountNumber, leverage, name, customName, accountName } = req.body;
+  const { broker, apiKey, isPaper, simulatedBalance, server, accountNumber, leverage, name, customName, accountName, userId = '', userEmail = '' } = req.body;
+  const cleanUserId = typeof userId === 'string' ? userId.trim() : '';
+  const cleanEmail = typeof userEmail === 'string' ? userEmail.trim() : '';
   const masked = apiKey ? `${apiKey.slice(0, 4)}••••••••••••${apiKey.slice(-4)}` : '••••••••••••';
   const assignedName = (customName || accountName || name)?.trim() || `${broker} Account`;
   const newAccount: any = {
     id: `acc_${broker.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
+    userId: cleanUserId,
+    userEmail: cleanEmail,
     name: assignedName,
     broker,
     server: server || `${broker}-Live`,
@@ -858,14 +887,16 @@ app.post('/api/brokers/:id/rename', (req, res) => {
 });
 
 app.post('/api/brokers/select-active', (req, res) => {
-  const { accountId } = req.body;
+  const { accountId, userId } = req.body;
   const target = db.brokerAccounts.find((b) => b.id === accountId);
   if (!target) {
     return res.status(404).json({ success: false, message: 'Account not found' });
   }
 
   db.brokerAccounts.forEach((b) => {
-    b.isActiveForTakeover = b.id === accountId;
+    if (!userId || b.userId === userId) {
+      b.isActiveForTakeover = b.id === accountId;
+    }
   });
 
   db.botState.activeBrokerAccountId = target.id;
@@ -960,20 +991,28 @@ app.post('/api/brokers/:id/stop-server', (req, res) => {
 });
 
 app.post('/api/brokers/server/pause-all', (req, res) => {
+  const userId = String(req.query.userId || req.body?.userId || '').trim();
   db.brokerAccounts.forEach((acc) => {
-    acc.serverStatus = 'PAUSED';
+    if (!userId || acc.userId === userId) {
+      acc.serverStatus = 'PAUSED';
+    }
   });
   tradingEngine.pause();
-  res.json({ success: true, botState: db.botState, brokerAccounts: db.brokerAccounts });
+  const userAccounts = db.brokerAccounts.filter((b) => !userId || b.userId === userId);
+  res.json({ success: true, botState: db.botState, brokerAccounts: userAccounts });
 });
 
 app.post('/api/brokers/server/run-all', (req, res) => {
+  const userId = String(req.query.userId || req.body?.userId || '').trim();
   db.brokerAccounts.forEach((acc) => {
-    acc.serverStatus = 'RUNNING';
-    acc.isNonStop = true;
+    if (!userId || acc.userId === userId) {
+      acc.serverStatus = 'RUNNING';
+      acc.isNonStop = true;
+    }
   });
   tradingEngine.resume();
-  res.json({ success: true, botState: db.botState, brokerAccounts: db.brokerAccounts });
+  const userAccounts = db.brokerAccounts.filter((b) => !userId || b.userId === userId);
+  res.json({ success: true, botState: db.botState, brokerAccounts: userAccounts });
 });
 
 app.post('/api/brokers/purge-mock-data', (req, res) => {
@@ -983,73 +1022,74 @@ app.post('/api/brokers/purge-mock-data', (req, res) => {
 });
 
 app.post('/api/brokers/sync', (req, res) => {
-  const { accounts } = req.body;
-  if (Array.isArray(accounts) && accounts.length > 0) {
-    let addedCount = 0;
+  const { accounts, userId, userEmail } = req.body || {};
+  const cleanUserId = typeof userId === 'string' ? userId.trim() : '';
+  const cleanEmail = typeof userEmail === 'string' ? userEmail.trim() : '';
+
+  if (!cleanUserId) {
+    // Unauthenticated or unscoped sync: never return global accounts
+    return res.json({ success: true, accounts: [], botState: db.botState });
+  }
+
+  // Preserve other users' accounts, and replace accounts for this specific user
+  const otherUsersAccounts = db.brokerAccounts.filter((b) => b.userId && b.userId !== cleanUserId);
+  const userSyncedAccounts: any[] = [];
+
+  if (Array.isArray(accounts)) {
     for (const incoming of accounts) {
       if (!incoming || !incoming.accountNumber) continue;
       // Permanently reject legacy 'chek demo' or mock account IDs
       if (incoming.name === 'chek demo' || incoming.id === 'acc_mt5_1789564204252') continue;
 
-      const existing = db.brokerAccounts.find(
-        (b) => b.id === incoming.id || (b.accountNumber === incoming.accountNumber && b.server === incoming.server)
-      );
-      if (existing) {
-        // Merge attributes while preserving status if running
-        if (incoming.name) existing.name = incoming.name;
-        if (incoming.simulatedBalance) existing.simulatedBalance = incoming.simulatedBalance;
-        if (!existing.serverStatus) existing.serverStatus = 'RUNNING';
-        existing.isNonStop = true;
-        existing.savedInSystem = true;
-      } else {
-        const normalized: any = {
-          ...incoming,
-          id: incoming.id || `acc_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-          serverStatus: incoming.serverStatus || 'RUNNING',
-          isNonStop: true,
-          savedInSystem: true,
-          connectedAt: incoming.connectedAt || Date.now(),
-          uptimeSeconds: incoming.uptimeSeconds || 0,
-        };
-        db.brokerAccounts.push(normalized);
-        addedCount++;
-      }
-    }
-
-    if (addedCount > 0) {
-      db.persistAccounts();
-      if (!db.botState.activeBrokerAccountId && db.brokerAccounts.length > 0) {
-        const first = db.brokerAccounts[0];
-        first.isActiveForTakeover = true;
-        db.botState.activeBrokerAccountId = first.id;
-        db.botState.activeBrokerAccountName = first.name;
-        db.botState.environment = first.isPaper ? 'paper' : 'live';
-        db.botState.isRunning = true;
-        db.botState.status = 'ONLINE';
-        db.botState.serverEngineStatus = 'RUNNING';
-        db.botState.isNonStopLoop = true;
-      }
-      db.addAuditLog('SYSTEM', 'ACCOUNTS_SYNCED', `Synchronized ${addedCount} account(s) into persistent system store.`, 'INFO');
-      tradingEngine.broadcastState();
+      userSyncedAccounts.push({
+        ...incoming,
+        userId: cleanUserId,
+        userEmail: cleanEmail || incoming.userEmail,
+        id: incoming.id || `acc_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        serverStatus: incoming.serverStatus || 'RUNNING',
+        isNonStop: true,
+        savedInSystem: true,
+        connectedAt: incoming.connectedAt || Date.now(),
+        uptimeSeconds: incoming.uptimeSeconds || 0,
+      });
     }
   }
 
-  res.json({ success: true, accounts: db.brokerAccounts, botState: db.botState });
+  db.brokerAccounts = [...otherUsersAccounts, ...userSyncedAccounts];
+  db.persistAccounts();
+
+  if (!db.botState.activeBrokerAccountId && userSyncedAccounts.length > 0) {
+    const first = userSyncedAccounts[0];
+    first.isActiveForTakeover = true;
+    db.botState.activeBrokerAccountId = first.id;
+    db.botState.activeBrokerAccountName = first.name;
+    db.botState.environment = first.isPaper ? 'paper' : 'live';
+    db.botState.isRunning = true;
+    db.botState.status = 'ONLINE';
+    db.botState.serverEngineStatus = 'RUNNING';
+    db.botState.isNonStopLoop = true;
+  }
+
+  tradingEngine.broadcastState();
+  res.json({ success: true, accounts: userSyncedAccounts, botState: db.botState });
 });
 
 app.delete('/api/brokers/:id', (req, res) => {
   const { id } = req.params;
-  const idx = db.brokerAccounts.findIndex((b) => b.id === id);
+  const userId = String(req.query.userId || req.body?.userId || '').trim();
+
+  const idx = db.brokerAccounts.findIndex((b) => b.id === id && (!userId || b.userId === userId));
   if (idx !== -1) {
     const removed = db.brokerAccounts.splice(idx, 1)[0];
     db.persistAccounts();
     db.addAuditLog('BROKER', 'BROKER_ACCOUNT_DELETED', `Permanently deleted server instance and removed ${removed.broker} (${removed.accountNumber}) from system.`);
     db.addNotification('SYSTEM', 'Server Deleted', `Account #${removed.accountNumber} deleted and removed from system storage.`, 'warning');
 
-    // If removed account was the active takeover target, select next available account
+    // If removed account was the active takeover target, select next available account for this user
     if (db.botState.activeBrokerAccountId === id) {
-      if (db.brokerAccounts.length > 0) {
-        const next = db.brokerAccounts[0];
+      const remainingForUser = db.brokerAccounts.filter((b) => !userId || b.userId === userId);
+      if (remainingForUser.length > 0) {
+        const next = remainingForUser[0];
         next.isActiveForTakeover = true;
         db.botState.activeBrokerAccountId = next.id;
         db.botState.activeBrokerAccountName = next.name;
@@ -1074,8 +1114,10 @@ app.delete('/api/brokers/:id', (req, res) => {
       }
     }
   }
+
+  const remainingForUser = db.brokerAccounts.filter((b) => !userId || b.userId === userId);
   tradingEngine.broadcastState();
-  res.json({ success: true, brokerAccounts: db.brokerAccounts, botState: db.botState });
+  res.json({ success: true, brokerAccounts: remainingForUser, botState: db.botState });
 });
 
 // -----------------------------------------------------------------------------

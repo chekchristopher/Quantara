@@ -463,6 +463,8 @@ export interface MT5TradeControlConfig {
 
 export interface BrokerAccount {
   id: string;
+  userId?: string;
+  userEmail?: string;
   name: string;
   broker: string;
   server?: string;

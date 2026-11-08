@@ -264,7 +264,7 @@ export class TradingEngine {
       notifications: db.notifications.slice(0, 20),
       assets: marketDataService.getAllAssets(),
       riskSettings: db.riskSettings,
-      brokerAccounts: db.brokerAccounts,
+      brokerAccounts: [], // User isolation: private broker accounts must never be broadcast over public SSE stream
       offlineSessionStats: db.offlineSessionStats,
       economicEvents: economicCalendarService.getUpcomingEvents(),
       blackoutStatus: economicCalendarService.checkBlackoutStatus(),

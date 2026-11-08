@@ -351,6 +351,7 @@ export const firestoreSync = {
     const payload = {
       id: broker.id,
       userId,
+      userEmail: broker.userEmail,
       name: broker.name,
       broker: broker.broker,
       brokerName: broker.name || broker.broker,
@@ -416,13 +417,17 @@ export const firestoreSync = {
   subscribeBrokers(userId: string, onUpdate: (brokers: BrokerAccount[]) => void): Unsubscribe {
     const path = `users/${userId}/brokers`;
     const colRef = collection(db, 'users', userId, 'brokers');
-    const q = query(colRef, where('userId', '==', userId));
     return onSnapshot(
-      q,
+      colRef,
       (snap) => {
         const brokers: BrokerAccount[] = [];
         snap.forEach((docSnap) => {
           const d = docSnap.data();
+          // Defensive cleanup: if an account belonging to another user was saved here during earlier cross-contamination, delete it
+          if (d.userId && d.userId !== userId) {
+            deleteDoc(docSnap.ref).catch(console.warn);
+            return;
+          }
           // Permanently scrub legacy 'chek demo' or mock account from Firestore
           if (d.name === 'chek demo' || d.id === 'acc_mt5_1789564204252') {
             deleteDoc(docSnap.ref).catch(console.warn);
@@ -431,6 +436,8 @@ export const firestoreSync = {
 
           brokers.push({
             id: d.id,
+            userId: userId,
+            userEmail: d.userEmail,
             name: d.name || d.broker || 'Broker Account',
             broker: d.broker || d.name || 'MT5 Broker',
             server: d.server || 'Exness-MT5Real',

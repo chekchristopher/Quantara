@@ -186,7 +186,7 @@ function QuantaraApp() {
           if (data.notifications) setNotifications(data.notifications);
           if (data.assets) setAssets(data.assets);
           if (data.riskSettings) setRiskSettings(data.riskSettings);
-          if (data.brokerAccounts) setBrokerAccounts(data.brokerAccounts);
+          // Zero-trust isolation: brokerAccounts are strictly loaded per authenticated user via Firestore and user-scoped API
           if (data.offlineSessionStats) {
             setOfflineReport(data.offlineSessionStats);
             if (data.offlineSessionStats.hasUnseenReport) {
@@ -224,9 +224,12 @@ function QuantaraApp() {
     }
   };
 
-  // Sync with Firestore Cloud Database for authenticated user
+  // Sync with Firestore Cloud Database for authenticated user (Strict User Isolation)
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      setBrokerAccounts([]);
+      return;
+    }
 
     // Real-time risk settings subscription from Firestore
     const unsubRisk = firestoreSync.subscribeRiskSettings(user.uid, (cloudRisk) => {
@@ -235,43 +238,54 @@ function QuantaraApp() {
       }
     });
 
-    // Real-time broker profiles subscription from Firestore
+    // Real-time broker profiles subscription from Firestore (strictly scoped to user.uid)
     const unsubBrokers = firestoreSync.subscribeBrokers(user.uid, (cloudBrokers) => {
-      if (cloudBrokers && cloudBrokers.length > 0) {
-        setBrokerAccounts(cloudBrokers);
-        // Sync with backend engine so server runs non-stop on these accounts
-        api.syncBrokerAccounts(cloudBrokers).catch(console.warn);
-      }
+      // Ensure only this user's accounts are ever set in state
+      const verifiedBrokers = (cloudBrokers || []).filter((b) => !b.userId || b.userId === user.uid);
+      setBrokerAccounts(verifiedBrokers);
+      // Sync strictly for this user on the server
+      api.syncBrokerAccounts(verifiedBrokers, user.uid, user.email || undefined).catch(console.warn);
     });
 
     return () => {
       unsubRisk();
       unsubBrokers();
     };
-  }, [user?.uid]);
+  }, [user?.uid, user?.email]);
 
-  // LocalStorage backup for accounts so connected accounts persist locally and sync to server
+  // LocalStorage backup for accounts partitioned by user UID (prevents cross-account data leakage)
   useEffect(() => {
+    if (!user?.uid) return;
     try {
-      localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(brokerAccounts));
+      localStorage.setItem(`quantara_connected_accounts_${user.uid}`, JSON.stringify(brokerAccounts));
     } catch (e) {
       console.warn('Storage save warning:', e);
     }
-  }, [brokerAccounts]);
+  }, [brokerAccounts, user?.uid]);
 
-  // Initial cold-start check: scrub legacy 'chek demo' or mock accounts and hydrate clean real accounts
+  // Hydrate user-specific accounts on user login and purge legacy unpartitioned global storage
   useEffect(() => {
+    // Scrub legacy unpartitioned global key so old accounts cannot bleed across users
     try {
-      const saved = localStorage.getItem('quantara_connected_accounts_v2');
+      localStorage.removeItem('quantara_connected_accounts_v2');
+    } catch (e) {}
+
+    if (!user?.uid) {
+      setBrokerAccounts([]);
+      return;
+    }
+
+    try {
+      const saved = localStorage.getItem(`quantara_connected_accounts_${user.uid}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const cleanAccounts = parsed.filter((a: any) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
-          if (cleanAccounts.length !== parsed.length) {
-            localStorage.setItem('quantara_connected_accounts_v2', JSON.stringify(cleanAccounts));
-          }
+          const cleanAccounts = parsed.filter(
+            (a: any) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252' && (!a.userId || a.userId === user.uid)
+          );
           if (cleanAccounts.length > 0) {
-            api.syncBrokerAccounts(cleanAccounts).then((res) => {
+            setBrokerAccounts(cleanAccounts);
+            api.syncBrokerAccounts(cleanAccounts, user.uid, user.email || undefined).then((res) => {
               if (res?.accounts) setBrokerAccounts(res.accounts);
               if (res?.botState) setBotState(res.botState);
             }).catch(console.warn);
@@ -281,7 +295,7 @@ function QuantaraApp() {
     } catch (e) {
       console.warn('Storage restore warning:', e);
     }
-  }, []);
+  }, [user?.uid, user?.email]);
 
   // Sync trade history items into user's private Firestore journal
   const syncedTradeIdsRef = useRef<Set<string>>(new Set());
@@ -437,26 +451,36 @@ function QuantaraApp() {
   };
 
   const handleConnectBroker = async (payload: any) => {
-    const res = await api.connectBroker(payload);
+    const enrichedPayload = {
+      ...payload,
+      userId: user?.uid,
+      userEmail: user?.email,
+    };
+    const res = await api.connectBroker(enrichedPayload);
     if (user?.uid && res?.account) {
-      firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+      await firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
     }
     return res;
   };
 
   const handleLoginMT5Broker = async (payload: any) => {
-    const res = await api.loginMT5Broker(payload);
-    const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) {
-      setBrokerAccounts(brokers);
-      if (user?.uid) {
-        brokers.forEach((b) => firestoreSync.saveBrokerProfile(user.uid, b).catch(console.warn));
-        firestoreSync.appendAuditLog(user.uid, {
-          action: 'MT5_BROKER_LOGIN',
-          category: 'BROKER',
-          details: { broker: payload.brokerName, server: payload.server, login: payload.login },
-        }).catch(console.warn);
-      }
+    const enrichedPayload = {
+      ...payload,
+      userId: user?.uid,
+      userEmail: user?.email,
+    };
+    const res = await api.loginMT5Broker(enrichedPayload);
+    if (user?.uid && res?.account) {
+      await firestoreSync.saveBrokerProfile(user.uid, res.account).catch(console.warn);
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+      firestoreSync.appendAuditLog(user.uid, {
+        action: 'MT5_BROKER_LOGIN',
+        category: 'BROKER',
+        details: { broker: payload.brokerName, server: payload.server, login: payload.login },
+      }).catch(console.warn);
     }
     const assetsData = await api.getMarketAssets();
     if (Array.isArray(assetsData)) setAssets(assetsData);
@@ -465,21 +489,25 @@ function QuantaraApp() {
 
   const handleUpdateMT5Control = async (payload: any) => {
     const res = await api.updateMT5Control(payload);
-    const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    if (user?.uid) {
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    }
     return res;
   };
 
   const handleCloseAllMT5 = async () => {
     const res = await api.closeAllMT5Positions();
-    const snap = await api.getBrokerAccounts();
-    if (Array.isArray(snap)) setBrokerAccounts(snap);
+    if (user?.uid) {
+      const snap = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(snap)) setBrokerAccounts(snap);
+    }
     setPositions([]);
     return res;
   };
 
   const handleDisconnectBroker = async (id: string) => {
-    const res = await api.disconnectBroker(id);
+    const res = await api.disconnectBroker(id, user?.uid);
     if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
     if (res?.botState) setBotState(res.botState);
     if (user?.uid) {
@@ -495,7 +523,7 @@ function QuantaraApp() {
   };
 
   const handlePauseBrokerServer = async (id: string) => {
-    const res = await api.pauseBrokerServer(id);
+    const res = await api.pauseBrokerServer(id, user?.uid);
     if (res?.account) {
       setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
       if (res.botState) setBotState(res.botState);
@@ -505,7 +533,7 @@ function QuantaraApp() {
   };
 
   const handleResumeBrokerServer = async (id: string) => {
-    const res = await api.resumeBrokerServer(id);
+    const res = await api.resumeBrokerServer(id, user?.uid);
     if (res?.account) {
       setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
       if (res.botState) setBotState(res.botState);
@@ -515,7 +543,7 @@ function QuantaraApp() {
   };
 
   const handleStopBrokerServer = async (id: string) => {
-    const res = await api.stopBrokerServer(id);
+    const res = await api.stopBrokerServer(id, user?.uid);
     if (res?.account) {
       setBrokerAccounts((prev) => prev.map((a) => (a.id === id ? res.account : a)));
       if (res.botState) setBotState(res.botState);
@@ -525,14 +553,14 @@ function QuantaraApp() {
   };
 
   const handlePauseAllServers = async () => {
-    const res = await api.pauseAllServers();
+    const res = await api.pauseAllServers(user?.uid);
     if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
     if (res?.botState) setBotState(res.botState);
     return res;
   };
 
   const handleRunAllServers = async () => {
-    const res = await api.runAllServersNonStop();
+    const res = await api.runAllServersNonStop(user?.uid);
     if (res?.brokerAccounts) setBrokerAccounts(res.brokerAccounts);
     if (res?.botState) setBotState(res.botState);
     return res;
@@ -540,10 +568,10 @@ function QuantaraApp() {
 
   const handleRenameBroker = async (id: string, name: string) => {
     const res = await api.renameBrokerAccount(id, name);
-    const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) {
-      setBrokerAccounts(brokers);
-      if (user?.uid) {
+    if (user?.uid) {
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) {
+        setBrokerAccounts(brokers);
         const renamed = brokers.find((b) => b.id === id);
         if (renamed) firestoreSync.saveBrokerProfile(user.uid, renamed).catch(console.warn);
         firestoreSync.appendAuditLog(user.uid, {
@@ -558,8 +586,12 @@ function QuantaraApp() {
 
   const handleRefreshData = async () => {
     try {
-      const brokers = await api.getBrokerAccounts();
-      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+      if (user?.uid) {
+        const brokers = await api.getBrokerAccounts(user.uid);
+        if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+      } else {
+        setBrokerAccounts([]);
+      }
       const assetsRes = await api.getMarketAssets();
       if (Array.isArray(assetsRes)) setAssets(assetsRes);
     } catch (e) {
@@ -596,8 +628,10 @@ function QuantaraApp() {
     if (res?.portfolio) setPortfolio(res.portfolio);
     if (res?.botState) setBotState(res.botState);
     // Refresh broker accounts
-    const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    if (user?.uid) {
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    }
   };
 
   const handleUpdateCompounding = async (payload: { mode: 'standard' | 'micro-wealth-accelerator'; target?: number; asymmetricFilter?: boolean }) => {
@@ -606,10 +640,12 @@ function QuantaraApp() {
   };
 
   const handleSelectActiveBroker = async (accountId: string) => {
-    const res = await api.selectActiveBroker(accountId);
+    const res = await api.selectActiveBroker(accountId, user?.uid);
     if (res?.botState) setBotState(res.botState);
-    const brokers = await api.getBrokerAccounts();
-    if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    if (user?.uid) {
+      const brokers = await api.getBrokerAccounts(user.uid);
+      if (Array.isArray(brokers)) setBrokerAccounts(brokers);
+    }
   };
 
   return (
