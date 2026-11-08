@@ -1,0 +1,11 @@
+[
+  {
+    "reference": "test_unpaid_12345",
+    "userEmail": "someone@example.com",
+    "uid": "uid_456",
+    "status": "REJECTED",
+    "reason": "Payment reference not found on NOWPayments invoice #5836437268",
+    "id": "att_1794147241936_2062",
+    "timestamp": "2026-11-08T14:14:01.936Z"
+  }
+]

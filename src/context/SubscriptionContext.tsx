@@ -221,6 +221,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const activateSubscription = async (txRef?: string, durationDays: number = DURATION_DAYS) => {
+    if (!isAdmin) {
+      console.warn('Direct subscription activation requires administrator privileges. Please use verifyPayment.');
+      return;
+    }
+
     const now = Date.now();
     const expiresAt = new Date(now + durationDays * 24 * 60 * 60 * 1000).toISOString();
     const startDate = new Date(now).toISOString();

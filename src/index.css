@@ -270,6 +270,21 @@ html.light .hover\:bg-\[\#202B40\]:hover {
   color: #1E40AF !important;
 }
 
+/* Payments & Billing Light Mode Precision */
+html.light .bg-\[\#0E121E\],
+html.light .bg-\[\#121622\],
+html.light .bg-\[\#090C14\],
+html.light .bg-\[\#0D1017\] {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+html.light tr:hover .text-zinc-300,
+html.light tr:hover .text-slate-800 {
+  color: #0F172A !important;
+}
+
 html.light nav.fixed.bottom-0 {
   background-color: rgba(255, 255, 255, 0.98) !important;
   border-top: 1px solid #E2E8F0 !important;

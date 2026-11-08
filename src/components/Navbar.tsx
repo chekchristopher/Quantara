@@ -28,6 +28,7 @@ import { BotState, NotificationItem, OfflineSessionStats, RiskSettings } from '.
 import { QuantaraLogoMark } from './QuantaraLogo';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
+import { useTheme } from '../context/ThemeContext';
 import { ThemeToggle } from './ThemeToggle';
 
 interface NavbarProps {
@@ -73,6 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenOfflineReport,
 }) => {
   const { user, profile, cloudSyncStatus } = useAuth();
+  const { isDark } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [timeUtc, setTimeUtc] = useState('');
@@ -217,7 +219,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-[#1F1F23] bg-[#0E0E11]/95 backdrop-blur-md">
+      <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-md transition-colors ${
+        isDark ? 'border-[#1F1F23] bg-[#0E0E11]/95 text-white' : 'border-slate-200 bg-white/95 text-slate-900 shadow-sm'
+      }`}>
         {/* Main Header Bar */}
         <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 lg:px-8 text-xs">
           {/* Left: Brand + Hamburger Menu Button */}
@@ -230,19 +234,25 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`flex items-center space-x-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg border transition-all cursor-pointer select-none group ${
                 menuOpen
                   ? 'bg-blue-600/25 border-blue-500/60 text-white ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/10'
-                  : 'bg-[#141416] border-[#27272A] hover:border-blue-500/50 hover:bg-[#1B1D24] text-zinc-200 shadow-sm'
+                  : isDark
+                  ? 'bg-[#141416] border-[#27272A] hover:border-blue-500/50 hover:bg-[#1B1D24] text-zinc-200 shadow-sm'
+                  : 'bg-white border-slate-300 hover:border-blue-500/50 hover:bg-slate-50 text-slate-800 shadow-sm'
               }`}
               title="Open Navigation Menu (Dashboard, User Workbook, etc.)"
               aria-label="Navigation Menu"
             >
               {menuOpen ? (
-                <X className="h-4 w-4 text-white shrink-0" />
+                <X className={`h-4 w-4 shrink-0 ${isDark ? 'text-white' : 'text-slate-900'}`} />
               ) : (
-                <Menu className="h-4 w-4 text-blue-400 group-hover:text-blue-300 transition-colors shrink-0" />
+                <Menu className="h-4 w-4 text-blue-500 group-hover:text-blue-600 transition-colors shrink-0" />
               )}
-              <span className="font-semibold text-xs text-white">Menu</span>
+              <span className={`font-semibold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>Menu</span>
               {activeItem && (
-                <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#1C202E] text-blue-300 border border-[#2B3248] max-w-[130px] truncate">
+                <span className={`hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono border max-w-[130px] truncate ${
+                  isDark
+                    ? 'bg-[#1C202E] text-blue-300 border-[#2B3248]'
+                    : 'bg-blue-50 text-blue-700 border-blue-200 font-bold'
+                }`}>
                   {activeItem.label}
                 </span>
               )}
@@ -257,7 +267,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               <QuantaraLogoMark size="sm" />
               <div>
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
-                  <span className="font-brand text-base sm:text-lg font-extrabold tracking-[0.16em] sm:tracking-[0.18em] text-white flex items-center leading-none select-none group-hover:text-blue-300 transition-colors">
+                  <span className={`font-brand text-base sm:text-lg font-extrabold tracking-[0.16em] sm:tracking-[0.18em] flex items-center leading-none select-none transition-colors ${
+                    isDark ? 'text-white group-hover:text-blue-300' : 'text-slate-900 group-hover:text-blue-700'
+                  }`}>
                     QUANT<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500">ARA</span>
                   </span>
                   <span className="hidden xs:inline-flex rounded border border-blue-500/25 bg-blue-500/10 px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-tech font-bold uppercase tracking-wider text-blue-400 leading-none">
@@ -479,7 +491,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="fixed inset-0 z-50 flex animate-in fade-in duration-200">
           {/* Backdrop Blur Overlay */}
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
+            className={`fixed inset-0 ${isDark ? 'bg-black/80' : 'bg-slate-900/40'} backdrop-blur-sm cursor-pointer`}
             onClick={() => setMenuOpen(false)}
             aria-label="Close menu"
           />
@@ -487,28 +499,50 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Left Slide-Out Navigation Panel */}
           <div
             id="hamburger-navigation-drawer"
-            className="relative z-10 w-full max-w-sm sm:max-w-md bg-[#0D1017] border-r border-[#1E2330] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-left duration-200"
+            className={`relative z-10 w-full max-w-sm sm:max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-left duration-200 border-r ${
+              isDark ? 'bg-[#0D1017] border-[#1E2330]' : 'bg-white border-slate-200'
+            }`}
           >
             {/* Drawer Top Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E2330] bg-[#090C12]/90">
+            <div
+              className={`flex items-center justify-between px-5 py-4 border-b ${
+                isDark ? 'border-[#1E2330] bg-[#090C12]/90' : 'border-slate-200 bg-slate-50'
+              }`}
+            >
               <div className="flex items-center space-x-3">
                 <QuantaraLogoMark size="sm" />
                 <div>
                   <div className="flex items-center space-x-1.5">
-                    <span className="font-brand text-base font-extrabold tracking-wider text-white">
-                      QUANT<span className="text-blue-400">ARA</span>
+                    <span
+                      className={`font-brand text-base font-extrabold tracking-wider ${
+                        isDark ? 'text-white' : 'text-slate-900'
+                      }`}
+                    >
+                      QUANT<span className="text-blue-500">ARA</span>
                     </span>
-                    <span className="text-[9px] font-mono font-bold text-blue-400 px-1.5 py-0.2 rounded bg-blue-500/10 border border-blue-500/20">
+                    <span
+                      className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                        isDark
+                          ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                          : 'text-blue-700 bg-blue-50 border-blue-200'
+                      }`}
+                    >
                       NAVIGATOR
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#8E9299]">{timeUtc}</span>
+                  <span className={`text-[10px] font-mono ${isDark ? 'text-[#8E9299]' : 'text-slate-500'}`}>
+                    {timeUtc}
+                  </span>
                 </div>
               </div>
 
               <button
                 onClick={() => setMenuOpen(false)}
-                className="p-1.5 rounded-lg bg-[#151924] border border-[#232A3B] text-zinc-400 hover:text-white hover:bg-[#1E2538] transition-colors cursor-pointer"
+                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-[#151924] border-[#232A3B] text-zinc-400 hover:text-white hover:bg-[#1E2538]'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 shadow-sm'
+                }`}
                 title="Close Navigation (Esc)"
                 aria-label="Close Navigation"
               >
@@ -517,10 +551,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* User Profile & Database Snapshot */}
-            <div className="p-4 border-b border-[#1E2330] bg-[#0E121E]/60 space-y-3">
+            <div
+              className={`p-4 border-b space-y-3 ${
+                isDark ? 'border-[#1E2330] bg-[#0E121E]/60' : 'border-slate-200 bg-slate-50/70'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3 min-w-0">
-                  <div className="h-10 w-10 rounded-full bg-blue-500/20 border-2 border-blue-400/50 flex items-center justify-center font-mono text-xs font-bold text-blue-300 overflow-hidden shrink-0 shadow-md ring-1 ring-blue-500/30">
+                  <div
+                    className={`h-10 w-10 rounded-full border-2 flex items-center justify-center font-mono text-xs font-bold overflow-hidden shrink-0 shadow-md ${
+                      isDark
+                        ? 'bg-blue-500/20 border-blue-400/50 text-blue-300 ring-1 ring-blue-500/30'
+                        : 'bg-blue-100 border-blue-300 text-blue-700 ring-1 ring-blue-200'
+                    }`}
+                  >
                     {profile?.photoURL || user?.photoURL ? (
                       <img
                         src={profile?.photoURL || user?.photoURL}
@@ -534,14 +578,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-white truncate max-w-[140px]">
+                      <span
+                        className={`text-xs font-bold truncate max-w-[140px] ${
+                          isDark ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
                         {user ? profile?.displayName || user.displayName || user.email?.split('@')[0] : 'Guest Operator'}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${
+                          isDark
+                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}
+                      >
                         {user ? profile?.role || 'OPERATOR' : 'LOCAL'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-[#8E9299] font-mono truncate max-w-[180px]">
+                    <p
+                      className={`text-[11px] font-mono truncate max-w-[180px] ${
+                        isDark ? 'text-[#8E9299]' : 'text-slate-500'
+                      }`}
+                    >
                       {user ? user.email : 'DB: quantara-261d0'}
                     </p>
                   </div>
@@ -553,7 +611,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMenuOpen(false);
                       onOpenAuthModal();
                     }}
-                    className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/35 border border-blue-500/40 text-blue-200 transition-colors shrink-0 shadow-sm"
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 shadow-sm ${
+                      isDark
+                        ? 'bg-blue-600/20 hover:bg-blue-600/35 border-blue-500/40 text-blue-200'
+                        : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
+                    }`}
                   >
                     {user ? 'Account' : 'Sign In'}
                   </button>
@@ -562,16 +624,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Categorized Navigation Menu List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 divide-y divide-[#181C26]">
+            <div
+              className={`flex-1 overflow-y-auto p-4 space-y-5 divide-y ${
+                isDark ? 'divide-[#181C26]' : 'divide-slate-200'
+              }`}
+            >
               {categories.map((category) => {
                 const categoryItems = navItems.filter((i) => i.category === category);
                 return (
                   <div key={category} className="pt-3 first:pt-0 space-y-1.5">
                     <div className="flex items-center justify-between px-2 mb-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400/80 font-mono">
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider font-mono ${
+                          isDark ? 'text-blue-400/80' : 'text-blue-700 font-extrabold'
+                        }`}
+                      >
                         {category}
                       </span>
-                      <span className="text-[9px] text-[#6E727A] font-mono">
+                      <span className={`text-[9px] font-mono ${isDark ? 'text-[#6E727A]' : 'text-slate-500'}`}>
                         {categoryItems.length} items
                       </span>
                     </div>
@@ -584,38 +654,70 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <button
                             key={item.id}
                             onClick={() => handleSelectNav(item.id)}
-                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all group cursor-pointer ${
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all group cursor-pointer border ${
                               isActive
-                                ? 'bg-gradient-to-r from-blue-600/25 to-blue-500/10 text-white font-semibold border border-blue-500/50 shadow-md shadow-blue-500/10'
-                                : 'text-zinc-300 hover:bg-[#141824] hover:text-white border border-transparent'
+                                ? isDark
+                                  ? 'bg-gradient-to-r from-blue-600/25 to-blue-500/10 text-white font-semibold border-blue-500/50 shadow-md shadow-blue-500/10'
+                                  : 'bg-blue-50 text-blue-900 font-bold border-blue-300 shadow-sm'
+                                : isDark
+                                ? 'text-zinc-300 hover:bg-[#141824] hover:text-white border-transparent'
+                                : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 border-transparent'
                             }`}
                           >
                             <div className="flex items-start space-x-3 min-w-0">
                               <div
-                                className={`p-2 rounded-lg shrink-0 mt-0.5 transition-colors ${
+                                className={`p-2 rounded-lg shrink-0 mt-0.5 transition-colors border ${
                                   isActive
-                                    ? 'bg-blue-500/30 text-blue-300 border border-blue-400/40'
-                                    : 'bg-[#121622] text-[#8E9299] group-hover:text-blue-300 group-hover:bg-[#1A2030]'
+                                    ? isDark
+                                      ? 'bg-blue-500/30 text-blue-300 border-blue-400/40'
+                                      : 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                    : isDark
+                                    ? 'bg-[#121622] text-[#8E9299] group-hover:text-blue-300 group-hover:bg-[#1A2030] border-transparent'
+                                    : 'bg-slate-100 text-slate-600 group-hover:text-blue-700 group-hover:bg-blue-50 border-slate-200'
                                 }`}
                               >
                                 <Icon className="h-4 w-4" />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center space-x-2">
-                                  <span className="text-xs sm:text-sm font-semibold truncate text-white group-hover:text-blue-200 transition-colors">
+                                  <span
+                                    className={`text-xs sm:text-sm font-semibold truncate transition-colors ${
+                                      isActive
+                                        ? isDark
+                                          ? 'text-white'
+                                          : 'text-blue-950 font-bold'
+                                        : isDark
+                                        ? 'text-white group-hover:text-blue-200'
+                                        : 'text-slate-900 group-hover:text-blue-800'
+                                    }`}
+                                  >
                                     {item.label}
                                   </span>
                                   {!isSubscribed && item.id !== 'landing' && (
-                                    <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                                    <span
+                                      className={`inline-flex items-center space-x-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${
+                                        isDark
+                                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                                          : 'bg-amber-50 border-amber-300 text-amber-800'
+                                      }`}
+                                    >
                                       <Lock className="h-2.5 w-2.5" />
                                       <span>$100/mo</span>
                                     </span>
                                   )}
                                   {isActive && (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
+                                    <span
+                                      className={`h-1.5 w-1.5 rounded-full ${
+                                        isDark ? 'bg-blue-400 animate-ping' : 'bg-blue-600'
+                                      }`}
+                                    />
                                   )}
                                 </div>
-                                <p className="text-[11px] text-[#8E9299] font-sans truncate max-w-[220px] sm:max-w-[260px] leading-tight mt-0.5">
+                                <p
+                                  className={`text-[11px] font-sans truncate max-w-[220px] sm:max-w-[260px] leading-tight mt-0.5 ${
+                                    isDark ? 'text-[#8E9299]' : 'text-slate-600'
+                                  }`}
+                                >
                                   {item.desc}
                                 </p>
                               </div>
@@ -623,7 +725,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                             <ChevronRight
                               className={`h-4 w-4 shrink-0 transition-transform ${
-                                isActive ? 'text-blue-400 translate-x-0.5' : 'text-zinc-600 group-hover:text-zinc-400'
+                                isActive
+                                  ? isDark ? 'text-blue-400 translate-x-0.5' : 'text-blue-600 translate-x-0.5'
+                                  : isDark
+                                  ? 'text-zinc-600 group-hover:text-zinc-400'
+                                  : 'text-slate-400 group-hover:text-slate-600'
                               }`}
                             />
                           </button>
@@ -636,28 +742,46 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Drawer Theme & Appearance Switcher */}
-            <div className="px-4 py-3 border-t border-[#1E2330] bg-[#0E121E]/60 flex items-center justify-between">
+            <div
+              className={`px-4 py-3 border-t flex items-center justify-between ${
+                isDark ? 'border-[#1E2330] bg-[#0E121E]/60' : 'border-slate-200 bg-slate-50'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold text-white">Appearance Theme</p>
-                <p className="text-[10px] font-mono text-[#8E9299]">Light or Dark institutional mode</p>
+                <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Appearance Theme
+                </p>
+                <p className={`text-[10px] font-mono ${isDark ? 'text-[#8E9299]' : 'text-slate-500'}`}>
+                  Light or Dark institutional mode
+                </p>
               </div>
               <ThemeToggle variant="segmented" />
             </div>
 
             {/* Drawer Bottom Footer */}
-            <div className="p-3 border-t border-[#1E2330] bg-[#090C12] flex items-center justify-between text-[11px] font-mono text-[#8E9299]">
+            <div
+              className={`p-3 border-t flex items-center justify-between text-[11px] font-mono ${
+                isDark
+                  ? 'border-[#1E2330] bg-[#090C12] text-[#8E9299]'
+                  : 'border-slate-200 bg-slate-100 text-slate-600'
+              }`}
+            >
               <div className="flex items-center space-x-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Quantara v2.8 Core</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className={isDark ? 'text-zinc-400' : 'text-slate-800 font-semibold'}>
+                  Quantara v2.8 Core
+                </span>
               </div>
-              <span className="text-zinc-500">ESC to close</span>
+              <span className={isDark ? 'text-zinc-500' : 'text-slate-500'}>ESC to close</span>
             </div>
           </div>
         </div>
       )}
 
       {/* Mobile Sticky Bottom Navigation Bar (md:hidden) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0E0E11]/95 backdrop-blur-xl border-t border-[#1F1F23] px-2 py-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-2xl">
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t px-2 py-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-2xl transition-colors ${
+        isDark ? 'bg-[#0E0E11]/95 border-[#1F1F23]' : 'bg-white/95 border-slate-200 shadow-md'
+      }`}>
         <button
           onClick={() => onSelectTab('dashboard')}
           className={`flex flex-col items-center justify-center p-1.5 rounded-lg transition-colors ${

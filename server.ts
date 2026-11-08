@@ -16,6 +16,7 @@ import { calculateEquityLotSize } from './src/utils/lotSize';
 import { generateOrderBookDepth } from './src/utils/orderBook';
 import { RISK_PROFILES, getProfileSettings } from './src/data/riskProfiles';
 import { economicCalendarService } from './server/economicCalendar';
+import { paymentsService } from './server/paymentsService';
 
 dotenv.config();
 
@@ -1415,8 +1416,18 @@ app.get('/api/subscription/status', (req, res) => {
   });
 });
 
+// Admin / emergency activation strictly authorized for platform admin
 app.post('/api/subscription/activate', (req, res) => {
-  const { transactionRef, durationDays } = req.body;
+  const { transactionRef, durationDays, adminKey, userEmail } = req.body || {};
+  const isAdmin = userEmail === 'chekchris85@gmail.com' || adminKey === process.env.ADMIN_SECRET_KEY;
+
+  if (!isAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: 'Unauthorized: Direct subscription activation requires administrator privileges.',
+    });
+  }
+
   const days = durationDays || 30;
   const now = Date.now();
   const startDate = new Date(now).toISOString();
@@ -1431,42 +1442,52 @@ app.post('/api/subscription/activate', (req, res) => {
     paymentProvider: 'NOWPayments',
     invoiceId: '5836437268',
     paymentUrl: 'https://nowpayments.io/payment/?iid=5836437268&source=button',
-    transactionRef: transactionRef || `nowpay_${Math.floor(Math.random() * 899999 + 100000)}`,
-    activatedBy: 'operator',
+    transactionRef: transactionRef || `ADMIN_VIP_${Date.now()}`,
+    activatedBy: userEmail || 'admin',
   };
 
-  db.addAuditLog('AUTH', 'SUBSCRIPTION_ACTIVATED', `30-Day Terminal Access activated ($100/mo) via NOWPayments. Valid until ${expiresAt}. Ref: ${activeSubscription.transactionRef}`, 'INFO');
-  db.addNotification('SYSTEM', 'Subscription Active', '30-day Quantara Institutional license activated via NOWPayments.', 'success');
+  db.addAuditLog('AUTH', 'SUBSCRIPTION_ACTIVATED', `30-Day Terminal Access authorized by admin for ${userEmail || 'operator'}. Valid until ${expiresAt}. Ref: ${activeSubscription.transactionRef}`, 'INFO');
+  db.addNotification('SYSTEM', 'Subscription Active', '30-day Quantara Institutional license activated by administrator.', 'success');
   tradingEngine.broadcastState();
 
   res.json({ success: true, subscription: activeSubscription });
 });
 
-app.post('/api/subscription/verify', (req, res) => {
-  const { reference, durationDays = 30, userEmail } = req.body || {};
+// Strict Payment Verification with real NOWPayments API & IPN ledger tracking
+app.post('/api/subscription/verify', async (req, res) => {
+  const { reference, durationDays = 30, userEmail, uid } = req.body || {};
+
+  const user = typeof userEmail === 'string' ? userEmail.trim() : '';
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      verified: false,
+      message: 'Not verified',
+      errorDetail: 'Sign-in required: You must first sign in to your Quantara account before verifying a payment.',
+    });
+  }
 
   const trimmed = typeof reference === 'string' ? reference.trim() : '';
-  if (!trimmed) {
+  const isAdmin = user === 'chekchris85@gmail.com';
+
+  const verification = await paymentsService.verifyReference(trimmed, user, uid, isAdmin);
+
+  if (!verification.verified) {
+    db.addAuditLog(
+      'AUTH',
+      'PAYMENT_VERIFICATION_FAILED',
+      `Payment verification rejected for ${user}. Reference: "${trimmed}". Reason: ${verification.errorDetail || verification.message}`,
+      'WARN'
+    );
     return res.status(400).json({
       success: false,
       verified: false,
-      message: 'Not verified',
-      errorDetail: 'Payment reference is mandatory. Please enter your NOWPayments Payment ID or Transaction Hash.',
+      message: verification.message,
+      errorDetail: verification.errorDetail,
     });
   }
 
-  // Institutional validation: minimum 6 characters, not dummy/placeholder
-  const lower = trimmed.toLowerCase();
-  const invalidPlaceholders = ['test', 'none', 'dummy', 'fake', 'placeholder', '12345', '123456', 'asdf', 'nil', 'null'];
-  if (trimmed.length < 6 || invalidPlaceholders.includes(lower)) {
-    return res.status(400).json({
-      success: false,
-      verified: false,
-      message: 'Not verified',
-      errorDetail: 'The provided Payment ID could not be confirmed on NOWPayments invoice #5836437268. Please ensure you entered the exact Payment ID or transaction hash.',
-    });
-  }
-
+  // Verification succeeded with real payment proof
   const days = durationDays || 30;
   const now = Date.now();
   const startDate = new Date(now).toISOString();
@@ -1482,16 +1503,16 @@ app.post('/api/subscription/verify', (req, res) => {
     invoiceId: '5836437268',
     paymentUrl: 'https://nowpayments.io/payment/?iid=5836437268&source=button',
     transactionRef: trimmed,
-    activatedBy: userEmail || 'verified_operator',
+    activatedBy: user,
   };
 
   db.addAuditLog(
     'AUTH',
     'PAYMENT_VERIFIED',
-    `Payment verified on NOWPayments invoice #5836437268 for ${userEmail || 'operator'}. 30-Day Institutional Access activated. Valid until ${expiresAt}. Ref: ${trimmed}`,
+    `Cryptocurrency payment verified for ${user} on NOWPayments Invoice #5836437268. 30-Day Institutional Terminal unlocked. Ref: ${trimmed}`,
     'INFO'
   );
-  db.addNotification('SYSTEM', 'Payment Successful', `30-Day Quantara license verified & active for ${userEmail || 'operator'}. Ref: ${trimmed}`, 'success');
+  db.addNotification('SYSTEM', 'Payment Successful', `30-Day Quantara license verified & active for ${user}. Ref: ${trimmed}`, 'success');
   tradingEngine.broadcastState();
 
   return res.json({
@@ -1499,7 +1520,65 @@ app.post('/api/subscription/verify', (req, res) => {
     verified: true,
     message: 'Payment successful',
     subscription: activeSubscription,
+    paymentDetails: verification.payment,
   });
+});
+
+// NOWPayments IPN (Instant Payment Notification) Webhook Endpoint
+app.post('/api/subscription/nowpayments-webhook', (req, res) => {
+  try {
+    const result = paymentsService.handleIpnWebhook(req.body);
+    if (result.success && result.payment) {
+      db.addAuditLog(
+        'AUTH',
+        'IPN_WEBHOOK_RECEIVED',
+        `NOWPayments IPN callback: Payment ${result.payment.paymentId} status is "${result.payment.paymentStatus}". Amount: ${result.payment.actuallyPaid} ${result.payment.payCurrency}`,
+        'INFO'
+      );
+      if (['finished', 'confirmed'].includes(result.payment.paymentStatus)) {
+        tradingEngine.broadcastState();
+      }
+    }
+    return res.status(200).json({ ok: true, message: result.message });
+  } catch (err: any) {
+    console.error('[NOWPayments Webhook Error]', err);
+    return res.status(500).json({ ok: false, error: err?.message || 'Webhook processing failed' });
+  }
+});
+
+// Admin payment tracking and audit logs endpoint
+app.get('/api/subscription/admin/audit', (req, res) => {
+  const userEmail = String(req.query.userEmail || '').trim();
+  if (userEmail !== 'chekchris85@gmail.com') {
+    return res.status(403).json({ error: 'Access forbidden: Admin clearance required.' });
+  }
+
+  res.json({
+    attempts: paymentsService.getAttempts(),
+    verifiedPayments: paymentsService.getVerifiedPayments(),
+    webhookUrl: `${process.env.APP_URL || ''}/api/subscription/nowpayments-webhook`,
+    invoiceId: '5836437268',
+    monthlyFee: 100,
+    hasApiKey: Boolean(process.env.NOWPAYMENTS_API_KEY),
+  });
+});
+
+// Admin manual approval endpoint
+app.post('/api/subscription/admin/approve', (req, res) => {
+  const { adminEmail, paymentId, userEmail, uid, notes } = req.body || {};
+  if (adminEmail !== 'chekchris85@gmail.com') {
+    return res.status(403).json({ error: 'Access forbidden: Admin clearance required.' });
+  }
+
+  const result = paymentsService.adminManualApprove(adminEmail, paymentId, userEmail, uid, notes);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+
+  db.addAuditLog('AUTH', 'ADMIN_MANUAL_PAYMENT_APPROVAL', `Administrator (${adminEmail}) manually approved payment ${paymentId} for ${userEmail}. Notes: ${notes || 'Manual review verified'}`);
+  tradingEngine.broadcastState();
+
+  res.json(result);
 });
 
 
