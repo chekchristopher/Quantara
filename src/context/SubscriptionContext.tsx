@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserSubscription, SubscriptionStatus } from '../types';
+import { UserSubscription, SubscriptionStatus, PaymentRecord } from '../types';
 import { useAuth } from './AuthContext';
 import { firestoreSync } from '../services/firestoreSync';
 
@@ -8,6 +8,7 @@ interface SubscriptionContextType {
   isSubscribed: boolean;
   daysRemaining: number;
   hoursRemaining: number;
+  paymentHistory: PaymentRecord[];
   isPaywallOpen: boolean;
   paywallSource: string;
   openPaywall: (source?: string) => void;
@@ -67,6 +68,7 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile } = useAuth();
   const [subscription, setSubscription] = useState<UserSubscription>(getStoredSubscription);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
   const [isPaywallOpen, setIsPaywallOpen] = useState<boolean>(false);
   const [paywallSource, setPaywallSource] = useState<string>('general');
 
@@ -104,6 +106,38 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.warn('Failed to save subscription:', e);
     }
   }, [subscription, user?.uid]);
+
+  // Load and listen to user's payment history
+  useEffect(() => {
+    if (!user?.uid) {
+      setPaymentHistory([]);
+      return;
+    }
+
+    // Try reading cached payment records
+    try {
+      const cached = localStorage.getItem(`quantara_payments_${user.uid}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) setPaymentHistory(parsed);
+      }
+    } catch (e) {}
+
+    // Listen to real-time payments from Firestore
+    try {
+      const unsub = firestoreSync.listenPaymentHistory(user.uid, (records) => {
+        if (Array.isArray(records)) {
+          setPaymentHistory(records);
+          try {
+            localStorage.setItem(`quantara_payments_${user.uid}`, JSON.stringify(records));
+          } catch (err) {}
+        }
+      });
+      return () => unsub();
+    } catch (err) {
+      console.warn('Could not listen to Firestore payments:', err);
+    }
+  }, [user?.uid]);
 
   // Periodic expiration checker (every 30 seconds)
   useEffect(() => {
@@ -208,8 +242,36 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setSubscription(updatedSub);
     setIsPaywallOpen(false);
 
-    // Sync with Firestore if logged in
+    // Record payment in ledger and Firestore if logged in
     if (user?.uid) {
+      const recordId = `pay_${Date.now()}_${Math.floor(Math.random() * 89999 + 10000)}`;
+      const receiptNumber = `RCP-NOWP-${new Date().getFullYear()}-${Math.floor(Math.random() * 899999 + 100000)}`;
+      const newRecord: PaymentRecord = {
+        id: recordId,
+        userId: user.uid,
+        userEmail: user.email || 'operator@quantara.internal',
+        amount: MONTHLY_FEE_USD,
+        currency: 'USD',
+        plan: updatedSub.plan,
+        paymentProvider: 'NOWPayments',
+        invoiceId: NOWPAYMENTS_INVOICE_ID,
+        transactionRef: updatedSub.transactionRef || txRef || 'NOWPAY-AUTH-TOKEN',
+        status: 'CONFIRMED',
+        timestamp: new Date().toISOString(),
+        validFrom: startDate,
+        validUntil: expiresAt,
+        receiptNumber,
+        note: '30-day Quantara Institutional Software License activated via NOWPayments.',
+      };
+
+      setPaymentHistory((prev) => [newRecord, ...prev.filter((p) => p.id !== newRecord.id)]);
+
+      try {
+        await firestoreSync.recordPayment(user.uid, newRecord);
+      } catch (err) {
+        console.warn('Could not record payment to Firestore:', err);
+      }
+
       try {
         await firestoreSync.updateSubscription(user.uid, {
           subscriptionStatus: 'active',
@@ -270,8 +332,37 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (res.ok && data.verified && data.subscription) {
         setSubscription(data.subscription);
-        // Sync with Firestore if logged in
+
+        // Record verified payment in Firestore ledger
         if (user?.uid) {
+          const recordId = `pay_${Date.now()}_${Math.floor(Math.random() * 89999 + 10000)}`;
+          const receiptNumber = `RCP-NOWP-${new Date().getFullYear()}-${Math.floor(Math.random() * 899999 + 100000)}`;
+          const newRecord: PaymentRecord = {
+            id: recordId,
+            userId: user.uid,
+            userEmail: user.email || 'operator@quantara.internal',
+            amount: MONTHLY_FEE_USD,
+            currency: 'USD',
+            plan: data.subscription.plan || 'Quantara Institutional Software License',
+            paymentProvider: 'NOWPayments',
+            invoiceId: NOWPAYMENTS_INVOICE_ID,
+            transactionRef: trimmed,
+            status: 'CONFIRMED',
+            timestamp: new Date().toISOString(),
+            validFrom: data.subscription.startDate || new Date().toISOString(),
+            validUntil: data.subscription.expiresAt,
+            receiptNumber,
+            note: 'Verified crypto transaction on NOWPayments Invoice #5836437268.',
+          };
+
+          setPaymentHistory((prev) => [newRecord, ...prev.filter((p) => p.id !== newRecord.id)]);
+
+          try {
+            await firestoreSync.recordPayment(user.uid, newRecord);
+          } catch (err) {
+            console.warn('Could not record verified payment in Firestore:', err);
+          }
+
           try {
             await firestoreSync.updateSubscription(user.uid, {
               subscriptionStatus: 'active',
@@ -318,6 +409,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isSubscribed,
         daysRemaining,
         hoursRemaining,
+        paymentHistory,
         isPaywallOpen,
         paywallSource,
         openPaywall,

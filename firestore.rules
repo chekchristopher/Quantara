@@ -216,6 +216,25 @@ service cloud.firestore {
         (!('details' in data) || (data.details is string && data.details.size() <= 2048));
     }
 
+    function isValidPaymentRecord(data) {
+      return data.keys().hasAll(['id', 'userId', 'amount', 'currency', 'plan', 'paymentProvider', 'transactionRef', 'status', 'timestamp', 'validUntil', 'receiptNumber']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.amount is number && data.amount > 0 &&
+        data.currency is string && data.currency.size() <= 16 &&
+        data.plan is string && data.plan.size() <= 128 &&
+        data.paymentProvider is string && data.paymentProvider.size() <= 64 &&
+        data.transactionRef is string && data.transactionRef.size() <= 128 &&
+        data.status in ['CONFIRMED', 'PENDING', 'FAILED', 'EXPIRED'] &&
+        (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 256)) &&
+        (!('invoiceId' in data) || (data.invoiceId is string && data.invoiceId.size() <= 64)) &&
+        (!('validFrom' in data) || (data.validFrom is string && data.validFrom.size() <= 64)) &&
+        data.validUntil is string && data.validUntil.size() <= 64 &&
+        data.receiptNumber is string && data.receiptNumber.size() <= 64 &&
+        (!('note' in data) || (data.note is string && data.note.size() <= 512)) &&
+        data.timestamp is string && data.timestamp.size() <= 64;
+    }
+
     // --- Collections & Paths ---
 
     // Diagnostics & Connection Probe
@@ -353,6 +372,25 @@ service cloud.firestore {
 
         // Immutable compliance audit trail: no updates or deletes allowed
         allow update, delete: if false;
+      }
+
+      // Subcollection: Payment History & Invoices
+      match /payments/{paymentId} {
+        allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(paymentId);
+        allow list: if isSignedIn() && isOwner(userId);
+
+        allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+          isValidId(userId) && isValidId(paymentId) &&
+          incoming().userId == userId &&
+          isValidPaymentRecord(incoming());
+
+        allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
+          isValidId(userId) && isValidId(paymentId) &&
+          incoming().userId == userId &&
+          incoming().id == existing().id &&
+          isValidPaymentRecord(incoming());
+
+        allow delete: if isAdmin() && isValidId(userId) && isValidId(paymentId);
       }
     }
 

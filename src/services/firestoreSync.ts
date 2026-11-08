@@ -14,7 +14,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { BrokerAccount, RiskSettings, TradeHistoryItem, AuditLog, ServerAccountReport, TradeJournalEntry } from '../types';
+import { BrokerAccount, RiskSettings, TradeHistoryItem, AuditLog, ServerAccountReport, TradeJournalEntry, PaymentRecord } from '../types';
 
 export interface UserProfileDoc {
   id: string;
@@ -231,6 +231,54 @@ export const firestoreSync = {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   },
+
+  // Record Payment Transaction into User's Encrypted Ledger
+  async recordPayment(userId: string, payment: PaymentRecord): Promise<void> {
+    const paymentDocRef = doc(db, 'users', userId, 'payments', payment.id);
+    const path = `users/${userId}/payments/${payment.id}`;
+    try {
+      await setDoc(paymentDocRef, payment);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('client is offline')) {
+        setDoc(paymentDocRef, payment).catch(() => {});
+        return;
+      }
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // Retrieve All Payment History for User
+  async getPaymentHistory(userId: string): Promise<PaymentRecord[]> {
+    const paymentsCol = collection(db, 'users', userId, 'payments');
+    const path = `users/${userId}/payments`;
+    try {
+      const q = query(paymentsCol, orderBy('timestamp', 'desc'));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as PaymentRecord);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  // Real-time listener for Payment History
+  listenPaymentHistory(userId: string, callback: (payments: PaymentRecord[]) => void): Unsubscribe {
+    const paymentsCol = collection(db, 'users', userId, 'payments');
+    const path = `users/${userId}/payments`;
+    const q = query(paymentsCol, orderBy('timestamp', 'desc'));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const payments = snap.docs.map((d) => d.data() as PaymentRecord);
+        callback(payments);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, path);
+      }
+    );
+  },
+
   async saveRiskSettings(userId: string, settings: RiskSettings): Promise<void> {
     const path = `users/${userId}/settings/risk`;
     const settingsDocRef = doc(db, 'users', userId, 'settings', 'risk');

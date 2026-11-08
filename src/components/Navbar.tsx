@@ -22,6 +22,7 @@ import {
   X,
   Zap,
   Lock,
+  CreditCard,
 } from 'lucide-react';
 import { BotState, NotificationItem, OfflineSessionStats, RiskSettings } from '../types';
 import { QuantaraLogoMark } from './QuantaraLogo';
@@ -179,6 +180,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       category: 'System & Telemetry',
       icon: CheckCircle,
     },
+    {
+      id: 'payments',
+      label: 'Payments & History',
+      desc: 'Software license receipts, NOWPayments crypto transactions & 30-day billing ledger',
+      category: 'Account & Billing',
+      icon: CreditCard,
+    },
     ...(isAdmin
       ? [
           {
@@ -193,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   const handleSelectNav = (tabId: string) => {
-    if (tabId !== 'landing' && !isSubscribed) {
+    if (tabId !== 'landing' && tabId !== 'payments' && !isSubscribed) {
       openPaywall(`navbar_${tabId}`);
       setMenuOpen(false);
       return;
@@ -384,20 +392,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
             </div>
-
-            {/* NOWPayments Subscription CTA Button (Visible ONLY when unsubscribed) */}
-            {!isSubscribed && (
-              <button
-                type="button"
-                onClick={() => openPaywall('navbar_cta')}
-                className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-mono text-xs font-bold transition-all shadow-sm active:scale-[0.98]"
-                title="Subscribe to Quantara ($100/mo via NOWPayments)"
-              >
-                <Lock className="h-3.5 w-3.5 text-amber-400" />
-                <span className="hidden xs:inline">Subscribe</span>
-                <span className="text-[11px] text-amber-400">($100/mo)</span>
-              </button>
-            )}
 
             {/* Enterprise Auth & Account Profile Button */}
             {onOpenAuthModal && (

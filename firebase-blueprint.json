@@ -187,6 +187,29 @@
         "details": { "type": "string", "maxLength": 1024 }
       },
       "required": ["id", "userId", "timestamp", "level", "category", "action"]
+    },
+    "UserPaymentRecord": {
+      "title": "UserPaymentRecord",
+      "description": "Cryptocurrency payment records, NOWPayments invoices, and subscription activation receipts.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 16 },
+        "plan": { "type": "string", "maxLength": 128 },
+        "paymentProvider": { "type": "string", "maxLength": 64 },
+        "invoiceId": { "type": "string", "maxLength": 64 },
+        "transactionRef": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["CONFIRMED", "PENDING", "FAILED", "EXPIRED"] },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "validFrom": { "type": "string", "maxLength": 64 },
+        "validUntil": { "type": "string", "maxLength": 64 },
+        "receiptNumber": { "type": "string", "maxLength": 64 },
+        "note": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "userId", "amount", "currency", "plan", "paymentProvider", "transactionRef", "status", "timestamp", "validUntil", "receiptNumber"]
     }
   },
   "firestore": {
@@ -217,6 +240,10 @@
     "/users/{userId}/auditLogs/{logId}": {
       "schema": "UserAuditLog",
       "description": "Immutable compliance and security logs generated during trading sessions."
+    },
+    "/users/{userId}/payments/{paymentId}": {
+      "schema": "UserPaymentRecord",
+      "description": "Audited history of cryptocurrency license subscription payments."
     }
   }
 }

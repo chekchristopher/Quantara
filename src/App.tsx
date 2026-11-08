@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, Brain, Database, ShieldAlert, Sparkles, TrendingUp, User, Zap } from 'lucide-react';
+import { Activity, Brain, Database, ShieldAlert, Sparkles, TrendingUp, User, Zap, Lock } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WorkbookView } from './components/WorkbookView';
@@ -22,6 +22,7 @@ import { FloatingSafetyDock } from './components/FloatingSafetyDock';
 import { ToastNotificationCenter } from './components/ToastNotificationCenter';
 import { PerformanceStatementModal } from './components/PerformanceStatementModal';
 import { SubscriptionPaymentModal } from './components/SubscriptionPaymentModal';
+import { PaymentsBillingView } from './components/PaymentsBillingView';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { SubscriptionProvider, useSubscription } from './context/SubscriptionContext';
@@ -63,9 +64,9 @@ function QuantaraApp() {
     }
   }, [isSubscribed, user, currentTab]);
 
-  // Security Paywall Gate: Non-subscribed users can view ONLY the landing page
+  // Security Paywall Gate: Non-subscribed users can view ONLY the landing page and payments
   useEffect(() => {
-    if (!isSubscribed && currentTab !== 'landing') {
+    if (!isSubscribed && currentTab !== 'landing' && currentTab !== 'payments') {
       setCurrentTab('landing');
       openPaywall('terminal_gate');
     }
@@ -790,6 +791,13 @@ function QuantaraApp() {
           <SystemTestingView onRunTests={handleRunTests} />
         )}
 
+        {currentTab === 'payments' && (
+          <PaymentsBillingView
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
+            onNavigateTab={setCurrentTab}
+          />
+        )}
+
         {currentTab === 'admin' && (
           isAdmin ? (
             <AdminDashboardView
@@ -870,7 +878,10 @@ function QuantaraApp() {
       />
 
       {/* NOWPayments Subscription & 30-Day Paywall Modal */}
-      <SubscriptionPaymentModal onOpenAuthModal={() => setIsAuthModalOpen(true)} />
+      <SubscriptionPaymentModal
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onNavigateToPayments={() => setCurrentTab('payments')}
+      />
 
       {/* Real-time Toast Notifications with Web Audio Chimes */}
       <ToastNotificationCenter

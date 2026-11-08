@@ -26,9 +26,13 @@ import { useAuth } from '../context/AuthContext';
 
 interface SubscriptionPaymentModalProps {
   onOpenAuthModal?: () => void;
+  onNavigateToPayments?: () => void;
 }
 
-export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> = ({ onOpenAuthModal }) => {
+export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> = ({
+  onOpenAuthModal,
+  onNavigateToPayments,
+}) => {
   const {
     subscription,
     isSubscribed,
@@ -526,18 +530,35 @@ export const SubscriptionPaymentModal: React.FC<SubscriptionPaymentModalProps> =
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-t border-[#1E2330] bg-[#0A0D14] text-xs font-mono text-[#8E9299]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 sm:p-5 border-t border-[#1E2330] bg-[#0A0D14] text-xs font-mono text-[#8E9299]">
           <div className="flex items-center space-x-1.5">
             <Lock className="h-3.5 w-3.5 text-blue-400" />
             <span>256-Bit Encrypted Gateway</span>
           </div>
-          <button
-            type="button"
-            onClick={closePaywall}
-            className="text-zinc-400 hover:text-white transition-colors"
-          >
-            Cancel & Return
-          </button>
+
+          <div className="flex items-center space-x-4">
+            {onNavigateToPayments && (
+              <button
+                type="button"
+                onClick={() => {
+                  closePaywall();
+                  onNavigateToPayments();
+                }}
+                className="text-blue-400 hover:text-blue-300 font-semibold transition-colors flex items-center space-x-1"
+              >
+                <CreditCard className="h-3.5 w-3.5" />
+                <span>View Payment History</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={closePaywall}
+              className="text-zinc-400 hover:text-white transition-colors"
+            >
+              Cancel & Return
+            </button>
+          </div>
         </div>
       </div>
     </div>

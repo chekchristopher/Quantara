@@ -719,3 +719,21 @@ export interface UserSubscription {
   activatedBy?: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  amount: number;
+  currency: string;
+  plan: string;
+  paymentProvider: 'NOWPayments';
+  invoiceId: string;
+  transactionRef: string;
+  status: 'CONFIRMED' | 'PENDING' | 'FAILED' | 'EXPIRED';
+  timestamp: string;
+  validFrom: string;
+  validUntil: string;
+  receiptNumber: string;
+  note?: string;
+}
+
