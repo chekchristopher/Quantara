@@ -270,7 +270,7 @@ service cloud.firestore {
       // Subcollection: Risk Settings
       match /settings/{settingId} {
         allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(settingId);
-        allow list: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
         
         allow create, update: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
           isValidId(userId) && isValidId(settingId) &&
@@ -283,7 +283,7 @@ service cloud.firestore {
       // Subcollection: Broker Accounts & MT5 Credentials
       match /brokers/{brokerId} {
         allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId);
-        allow list: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
         allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
           isValidId(userId) && isValidId(brokerId) &&
@@ -302,7 +302,7 @@ service cloud.firestore {
         // Subcollection: Executed Trades for Connected Server
         match /trades/{tradeId} {
           allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(tradeId);
-          allow list: if isSignedIn() && isOwner(userId);
+          allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
           allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
             isValidId(userId) && isValidId(brokerId) && isValidId(tradeId) &&
@@ -322,7 +322,7 @@ service cloud.firestore {
         // Subcollection: Account Reports for Connected Server
         match /reports/{reportId} {
           allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(brokerId) && isValidId(reportId);
-          allow list: if isSignedIn() && isOwner(userId);
+          allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
           allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
             isValidId(userId) && isValidId(brokerId) && isValidId(reportId) &&
@@ -343,7 +343,7 @@ service cloud.firestore {
       // Subcollection: Trading Journal & Performance
       match /journal/{tradeId} {
         allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(tradeId);
-        allow list: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
         allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
           isValidId(userId) && isValidId(tradeId) &&
@@ -363,7 +363,7 @@ service cloud.firestore {
       // Subcollection: Audit Logs (Immutable)
       match /auditLogs/{logId} {
         allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(logId);
-        allow list: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
         allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
           isValidId(userId) && isValidId(logId) &&
@@ -377,7 +377,7 @@ service cloud.firestore {
       // Subcollection: Payment History & Invoices
       match /payments/{paymentId} {
         allow get: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidId(paymentId);
-        allow list: if isSignedIn() && isOwner(userId);
+        allow list: if isSignedIn() && (isOwner(userId) || isAdmin());
 
         allow create: if isSignedIn() && (isOwner(userId) || isAdmin()) &&
           isValidId(userId) && isValidId(paymentId) &&
