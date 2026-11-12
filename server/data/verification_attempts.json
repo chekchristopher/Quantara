@@ -1,5 +1,14 @@
 [
   {
+    "reference": "ADMIN_GRANT_1794328581366",
+    "userEmail": "test@operator.com",
+    "uid": "test_uid",
+    "status": "SUCCESS",
+    "reason": "Manually approved by administrator (chekchris85@gmail.com): Self-test",
+    "id": "att_1794328581367_4917",
+    "timestamp": "2026-11-10T16:36:21.367Z"
+  },
+  {
     "reference": "test_unpaid_12345",
     "userEmail": "someone@example.com",
     "uid": "uid_456",

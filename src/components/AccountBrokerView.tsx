@@ -78,6 +78,7 @@ interface AccountBrokerViewProps {
   onPauseAllServers?: () => Promise<any>;
   onRunAllServers?: () => Promise<any>;
   onNavigateTab?: (tab: string) => void;
+  onPurgeAllBrokers?: () => Promise<any>;
 }
 
 export const RANDOM_ACCOUNT_NAMES = [
@@ -308,6 +309,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   user,
   onRefreshData,
   onNavigateTab,
+  onPurgeAllBrokers,
 }) => {
   const [activeTab, setActiveTab] = useState<'control' | 'login' | 'accounts' | 'journal' | 'report' | 'bridge'>(
     brokerAccounts.length === 0 ? 'login' : 'control'
@@ -321,6 +323,33 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
   const [serverActionLoadingId, setServerActionLoadingId] = useState<string | null>(null);
   const [serverToDelete, setServerToDelete] = useState<BrokerAccount | null>(null);
   const [isDeletingServer, setIsDeletingServer] = useState(false);
+  const [showPurgeAllModal, setShowPurgeAllModal] = useState(false);
+  const [isPurgingAll, setIsPurgingAll] = useState(false);
+
+  const handleConfirmPurgeAll = async () => {
+    setIsPurgingAll(true);
+    try {
+      if (onPurgeAllBrokers) {
+        await onPurgeAllBrokers();
+      } else {
+        for (const b of brokerAccounts) {
+          await onDisconnectBroker(b.id);
+        }
+      }
+      setFeedbackMessage({
+        type: 'success',
+        text: 'All connected broker servers permanently deleted from the database.',
+      });
+      setShowPurgeAllModal(false);
+    } catch (err: any) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Failed to purge all brokers: ' + (err.message || 'Unknown error'),
+      });
+    } finally {
+      setIsPurgingAll(false);
+    }
+  };
 
   const formatServerUptime = (seconds?: number, connectedAt?: number) => {
     let sec = seconds || 0;
@@ -467,7 +496,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
       server: targetServer,
       login: loginId,
       password,
-      accountType,
+      accountType: 'REAL' as const,
       brokerName: selectedPreset.name === 'Custom MT5 Broker' ? 'Custom Broker' : selectedPreset.name,
       accountName: trimmedAccountName || undefined,
       customName: trimmedAccountName || undefined,
@@ -491,7 +520,7 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
       if (onLoginMT5) {
         const res = await onLoginMT5(payload);
         setFeedbackMessage({
-          text: res?.message || `Successfully authenticated to ${targetServer}. Auto-trading engine is ACTIVE.`,
+          text: res?.message || `Successfully authenticated to ${targetServer}. Real live auto-trading engine is ACTIVE.`,
           type: 'success',
         });
       } else {
@@ -501,8 +530,10 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
           accountNumber: loginId,
           name: trimmedAccountName || undefined,
           customName: trimmedAccountName || undefined,
-          isPaper: accountType !== 'REAL',
+          isPaper: false,
           simulatedBalance: balance,
+          balance,
+          equity: balance,
           leverage,
         });
         setFeedbackMessage({
@@ -879,6 +910,17 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                   >
                     <Trash2 className="h-3 w-3 text-red-400" />
                     <span>Remove Server</span>
+                  </button>
+                )}
+                {brokerAccounts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPurgeAllModal(true)}
+                    className="rounded-lg bg-red-600/15 hover:bg-red-600/25 border border-red-500/40 px-3 py-1.5 text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors flex items-center space-x-1"
+                    title="Permanently delete all connected brokers from database"
+                  >
+                    <Trash2 className="h-3 w-3 text-red-500" />
+                    <span>Delete All Brokers</span>
                   </button>
                 )}
                 {onCloseAllMT5 && (
@@ -1908,52 +1950,18 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                 4. Account Trading Mode
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* DEMO CARD */}
-                <button
-                  type="button"
-                  onClick={() => handleAccountTypeChange('DEMO')}
-                  className={`p-3.5 rounded-xl border text-left transition-all relative ${
-                    accountType === 'DEMO'
-                      ? 'border-amber-500/80 bg-amber-950/25 shadow-lg ring-1 ring-amber-500/50'
-                      : 'border-[#1F1F23] bg-[#0A0A0B] hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-tech text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center space-x-1.5">
-                      <span>DEMO Testing Run</span>
-                    </span>
-                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-bold text-amber-300 border border-amber-500/30">
-                      ★ RECOMMENDED FIRST
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#8E9299] leading-relaxed">
-                    Zero risk to capital. Connect a broker demo account to test algorithmic entries, execution speed, and verify profitability with live prices.
-                  </p>
-                </button>
-
-                {/* REAL CARD */}
-                <button
-                  type="button"
-                  onClick={() => handleAccountTypeChange('REAL')}
-                  className={`p-3.5 rounded-xl border text-left transition-all relative ${
-                    accountType === 'REAL'
-                      ? 'border-emerald-500/80 bg-emerald-950/25 shadow-lg ring-1 ring-emerald-500/50'
-                      : 'border-[#1F1F23] bg-[#0A0A0B] hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-tech text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center space-x-1.5">
-                      <span>REAL Live Account</span>
-                    </span>
-                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
-                      LIVE CAPITAL
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#8E9299] leading-relaxed">
-                    Live production trading with your real deposited funds. Strict risk controls, stop losses, and daily drawdown halts are enforced.
-                  </p>
-                </button>
+              <div className="p-3.5 rounded-xl border border-emerald-500/80 bg-emerald-950/25 shadow-lg ring-1 ring-emerald-500/50">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-tech text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center space-x-1.5">
+                    <span>REAL Live ECN Account (100% Real Market Execution)</span>
+                  </span>
+                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                    LIVE PRODUCTION CAPITAL
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#8E9299] leading-relaxed">
+                  Real live institutional routing with your broker funds. Zero simulations. Orders route directly into broker order books with sub-millisecond MT5 execution and real stop losses.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -2137,6 +2145,18 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                 <Plus className="h-3.5 w-3.5" />
                 <span>Link Another MT5</span>
               </button>
+
+              {brokerAccounts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPurgeAllModal(true)}
+                  className="rounded-lg bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 px-3.5 py-2 font-semibold text-red-400 hover:text-red-300 text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-red-600/10"
+                  title="Permanently delete all connected brokers from database"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                  <span>Delete All Brokers</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -2229,14 +2249,8 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          acc.isPaper
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20'
-                        }`}
-                      >
-                        {acc.isPaper ? 'DEMO / PROVING' : 'REAL LIVE'}
+                      <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20">
+                        REAL LIVE ECN
                       </span>
                       {isActiveTarget && (
                         <span className="rounded bg-[#10B981]/15 text-[#10B981] text-[9px] font-mono font-bold px-1.5 py-0.5 border border-[#10B981]/30">
@@ -2561,6 +2575,55 @@ export const AccountBrokerView: React.FC<AccountBrokerViewProps> = ({
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>{isDeletingServer ? 'Deleting...' : 'Confirm Delete Server'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete ALL Connected Brokers Confirmation Modal */}
+      {showPurgeAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/60 bg-[#0E1017] p-5 sm:p-6 space-y-4 shadow-2xl shadow-red-950/50">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-base text-white">Delete ALL Connected Brokers?</h4>
+                <p className="text-xs text-red-300">Permanent Database & Storage Purge</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-red-950/20 border border-red-500/30 p-3.5 text-xs space-y-2 text-zinc-300">
+              <p className="font-semibold text-white">
+                This action cannot be undone. It will:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-red-200 text-[11px]">
+                <li>Permanently delete every connected broker account ({brokerAccounts.length} account{brokerAccounts.length === 1 ? '' : 's'}).</li>
+                <li>Wipe all stored MT5 credentials and tokens from Firestore and server disk storage.</li>
+                <li>Halt autonomous execution and close all active broker positions and pending orders.</li>
+                <li>Reset portfolio balance to $0.00 until a new account is connected.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2433]">
+              <button
+                type="button"
+                disabled={isPurgingAll}
+                onClick={() => setShowPurgeAllModal(false)}
+                className="px-4 py-2 rounded-lg bg-[#141722] hover:bg-[#1A1F2E] text-zinc-300 text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPurgingAll}
+                onClick={handleConfirmPurgeAll}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono transition-colors flex items-center space-x-1.5 shadow-lg shadow-red-600/40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{isPurgingAll ? 'Purging All...' : 'Permanently Delete All'}</span>
               </button>
             </div>
           </div>

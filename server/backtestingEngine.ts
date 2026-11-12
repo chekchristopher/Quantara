@@ -127,7 +127,7 @@ export class BacktestingEngine {
           closePositionsOnKillSwitch: false,
         };
 
-        const sig = strategy.generateSignal(currentSlice, ind, regime, dummyRisk);
+        const sig = strategy.generateSignal(currentSlice, ind, regime, dummyRisk, req.symbol);
 
         if (sig.direction === 'BUY' || sig.direction === 'SELL') {
           const side: PositionSide = sig.direction === 'BUY' ? 'LONG' : 'SHORT';

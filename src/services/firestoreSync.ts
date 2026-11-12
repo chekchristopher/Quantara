@@ -413,6 +413,45 @@ export const firestoreSync = {
     }
   },
 
+  // Permanently delete all connected brokers for this user from Firestore
+  async deleteAllUserBrokers(userId: string): Promise<number> {
+    const path = `users/${userId}/brokers`;
+    try {
+      const colRef = collection(db, 'users', userId, 'brokers');
+      const snap = await getDocs(colRef);
+      let count = 0;
+      for (const docSnap of snap.docs) {
+        await deleteDoc(docSnap.ref);
+        count++;
+      }
+      return count;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+      return 0;
+    }
+  },
+
+  // Admin: Permanently delete every broker connected by any user in Firestore
+  async adminPurgeAllBrokers(): Promise<number> {
+    try {
+      const usersCol = collection(db, 'users');
+      const usersSnap = await getDocs(usersCol);
+      let totalDeleted = 0;
+      for (const uDoc of usersSnap.docs) {
+        const brokersCol = collection(db, 'users', uDoc.id, 'brokers');
+        const brokersSnap = await getDocs(brokersCol);
+        for (const bDoc of brokersSnap.docs) {
+          await deleteDoc(bDoc.ref);
+          totalDeleted++;
+        }
+      }
+      return totalDeleted;
+    } catch (error) {
+      console.warn('adminPurgeAllBrokers error:', error);
+      return 0;
+    }
+  },
+
   // Listen to Connected Brokers for this user
   subscribeBrokers(userId: string, onUpdate: (brokers: BrokerAccount[]) => void): Unsubscribe {
     const path = `users/${userId}/brokers`;
@@ -428,8 +467,15 @@ export const firestoreSync = {
             deleteDoc(docSnap.ref).catch(console.warn);
             return;
           }
-          // Permanently scrub legacy 'chek demo' or mock account from Firestore
-          if (d.name === 'chek demo' || d.id === 'acc_mt5_1789564204252') {
+          // Scrub MC DEMO TEST, legacy test IDs, and any simulated or demo accounts immediately from Firestore
+          if (
+            d.id === 'acc_mt5_1789564204252' ||
+            d.id === 'acc_mt5_1793927785320' ||
+            d.name === 'MC DEMO TEST' ||
+            d.name?.toLowerCase().includes('demo') ||
+            d.accountType === 'DEMO' ||
+            d.isPaper === true
+          ) {
             deleteDoc(docSnap.ref).catch(console.warn);
             return;
           }
@@ -530,7 +576,7 @@ export const firestoreSync = {
         const trades: TradeHistoryItem[] = [];
         snap.forEach((docSnap) => {
           const d = docSnap.data();
-          if (d.serverName === 'chek demo' || d.accountName === 'chek demo' || d.serverId === 'acc_mt5_1789564204252') {
+          if (d.serverId === 'acc_mt5_1789564204252') {
             deleteDoc(docSnap.ref).catch(console.warn);
             return;
           }
@@ -822,6 +868,228 @@ export const firestoreSync = {
       await setDoc(docRef, payload);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Administrator Operations (Multi-User Telemetry & License Management)
+  // ---------------------------------------------------------------------------
+
+  // Real-time listener for all user profiles in system
+  subscribeAllUsers(onUpdate: (users: UserProfileDoc[]) => void): Unsubscribe {
+    const path = 'users';
+    const colRef = collection(db, 'users');
+    return onSnapshot(
+      colRef,
+      (snap) => {
+        const users: UserProfileDoc[] = [];
+        snap.forEach((d) => {
+          users.push(d.data() as UserProfileDoc);
+        });
+        onUpdate(users);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, path);
+      }
+    );
+  },
+
+  // One-time fetch of all user profiles
+  async getAllUsersOnce(): Promise<UserProfileDoc[]> {
+    const path = 'users';
+    try {
+      const colRef = collection(db, 'users');
+      const snap = await getDocs(colRef);
+      return snap.docs.map((d) => d.data() as UserProfileDoc);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  // Grant or extend user license from admin portal
+  async adminGrantLicense(
+    targetUserId: string,
+    targetEmail: string,
+    planName: string = 'Quantara Institutional License',
+    durationDays: number = 30,
+    note?: string
+  ): Promise<{ success: boolean; expiresAt: string; paymentId: string }> {
+    const userDocRef = doc(db, 'users', targetUserId);
+    const path = `users/${targetUserId}`;
+    const now = new Date().toISOString();
+    // Calculate expiration timestamp (days * 24h)
+    const expiresAt = new Date(Date.now() + Math.max(1, durationDays) * 86400000).toISOString();
+    const paymentId = `ADMIN_GRANT_${Date.now()}_${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const receiptNumber = `RCP-ADMIN-${Date.now().toString().slice(-6)}`;
+
+    try {
+      // 1. Update user profile subscription status
+      await setDoc(
+        userDocRef,
+        {
+          subscriptionStatus: 'active',
+          subscriptionPlan: planName,
+          subscriptionExpiresAt: expiresAt,
+          subscriptionPaymentId: paymentId,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // 2. Insert verifiable payment invoice record in user's encrypted ledger
+      const paymentPath = `users/${targetUserId}/payments/${paymentId}`;
+      const paymentDocRef = doc(db, 'users', targetUserId, 'payments', paymentId);
+      const paymentRecord: PaymentRecord = {
+        id: paymentId,
+        userId: targetUserId,
+        userEmail: targetEmail,
+        amount: 100,
+        currency: 'USD',
+        plan: planName,
+        paymentProvider: 'ADMIN_CLEARANCE',
+        transactionRef: paymentId,
+        status: 'CONFIRMED',
+        timestamp: now,
+        validFrom: now,
+        validUntil: expiresAt,
+        receiptNumber,
+        note: note || `Quantara Institutional 30-Day License authorized directly by System Administrator (${auth.currentUser?.email || 'admin'})`,
+      };
+      await setDoc(paymentDocRef, paymentRecord);
+
+      // 3. Append immutable audit trail
+      await this.appendAuditLog(targetUserId, {
+        action: 'ADMIN_GRANT_LICENSE',
+        category: 'AUTH',
+        severity: 'INFO',
+        details: `Administrator (${auth.currentUser?.email || 'admin'}) granted ${durationDays}-day license (${planName}) to ${targetEmail}. Valid until ${expiresAt}. Ref: ${paymentId}.`,
+      }).catch(console.warn);
+
+      return { success: true, expiresAt, paymentId };
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
+    }
+  },
+
+  // Revoke user license from admin portal
+  async adminRevokeLicense(
+    targetUserId: string,
+    targetEmail: string,
+    reason?: string
+  ): Promise<void> {
+    const userDocRef = doc(db, 'users', targetUserId);
+    const path = `users/${targetUserId}`;
+    const now = new Date().toISOString();
+
+    try {
+      // Set status to expired
+      await setDoc(
+        userDocRef,
+        {
+          subscriptionStatus: 'expired',
+          subscriptionExpiresAt: now,
+          subscriptionPlan: 'Revoked by Administrator',
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // Append immutable audit log
+      await this.appendAuditLog(targetUserId, {
+        action: 'ADMIN_REVOKE_LICENSE',
+        category: 'AUTH',
+        severity: 'WARN',
+        details: `Administrator (${auth.currentUser?.email || 'admin'}) revoked software license for ${targetEmail}. Reason: ${reason || 'Manual administrative policy enforcement'}.`,
+      }).catch(console.warn);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
+    }
+  },
+
+  // Update user role and enterprise tier
+  async adminUpdateUserRoleAndTier(
+    targetUserId: string,
+    targetEmail: string,
+    role: UserProfileDoc['role'],
+    enterpriseTier: UserProfileDoc['enterpriseTier']
+  ): Promise<void> {
+    const userDocRef = doc(db, 'users', targetUserId);
+    const path = `users/${targetUserId}`;
+    const now = new Date().toISOString();
+
+    try {
+      await setDoc(
+        userDocRef,
+        {
+          role,
+          enterpriseTier,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      await this.appendAuditLog(targetUserId, {
+        action: 'ADMIN_UPDATE_ROLE_TIER',
+        category: 'AUTH',
+        severity: 'INFO',
+        details: `Administrator updated permissions for ${targetEmail} -> Role: ${role}, Tier: ${enterpriseTier}.`,
+      }).catch(console.warn);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
+    }
+  },
+
+  // Fetch all broker accounts connected by a specific user
+  async adminGetUserBrokers(targetUserId: string): Promise<BrokerAccount[]> {
+    const path = `users/${targetUserId}/brokers`;
+    try {
+      const colRef = collection(db, 'users', targetUserId, 'brokers');
+      const snap = await getDocs(colRef);
+      return snap.docs.map((d) => d.data() as BrokerAccount);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  // Fetch all payments made by a specific user
+  async adminGetUserPayments(targetUserId: string): Promise<PaymentRecord[]> {
+    const path = `users/${targetUserId}/payments`;
+    try {
+      const colRef = collection(db, 'users', targetUserId, 'payments');
+      const snap = await getDocs(colRef);
+      return snap.docs.map((d) => d.data() as PaymentRecord);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  // Fetch audit logs for a specific user
+  async adminGetUserAuditLogs(targetUserId: string): Promise<AuditLog[]> {
+    const path = `users/${targetUserId}/auditLogs`;
+    try {
+      const colRef = collection(db, 'users', targetUserId, 'auditLogs');
+      const snap = await getDocs(colRef);
+      return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: data.id || d.id,
+          timestamp: typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : (data.timestamp || Date.now()),
+          category: data.category || 'SYSTEM',
+          actor: data.actor || data.userId || 'Operator',
+          action: data.action || 'ACTIVITY',
+          details: data.details || '',
+          severity: data.severity || 'INFO',
+        } as AuditLog;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
     }
   },
 };

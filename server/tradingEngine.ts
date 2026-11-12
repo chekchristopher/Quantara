@@ -446,7 +446,8 @@ export class TradingEngine {
         asset.history,
         asset.indicators,
         asset.currentRegime,
-        db.riskSettings
+        db.riskSettings,
+        symbol
       );
 
       if (signalResult.direction === 'HOLD' || signalResult.confidenceScore < 65) {
@@ -455,6 +456,11 @@ export class TradingEngine {
 
       // Construct Signal object
       const signalId = `sig_${symbol.replace('/', '_')}_${Date.now()}`;
+      const stopDistanceRaw = Math.abs(signalResult.entryPrice - signalResult.suggestedStopLoss);
+      const tpDistanceRaw = Math.abs(signalResult.suggestedTakeProfit - signalResult.entryPrice);
+      const minDenom = signalResult.entryPrice > 10 ? 0.01 : 0.00005;
+      const calculatedRR = stopDistanceRaw > 0 ? Number((tpDistanceRaw / Math.max(minDenom, stopDistanceRaw)).toFixed(2)) : 2.4;
+
       const proposedSignal: TradingSignal = {
         id: signalId,
         timestamp: Date.now(),
@@ -467,7 +473,7 @@ export class TradingEngine {
         entryPrice: signalResult.entryPrice,
         suggestedStopLoss: signalResult.suggestedStopLoss,
         suggestedTakeProfit: signalResult.suggestedTakeProfit,
-        riskRewardRatio: Number((Math.abs(signalResult.suggestedTakeProfit - signalResult.entryPrice) / Math.max(0.01, Math.abs(signalResult.entryPrice - signalResult.suggestedStopLoss))).toFixed(2)),
+        riskRewardRatio: calculatedRR,
         recommendedPositionSizeUsd: 0,
         reasons: signalResult.reasons,
         passedRiskChecks: false,
@@ -488,7 +494,7 @@ export class TradingEngine {
       }
 
       // Asymmetric risk-reward filter (only trade high expectancy setups for small capital growth)
-      if (db.botState.asymmetricFilterEnabled && (proposedSignal.riskRewardRatio < 2.0 || proposedSignal.confidenceScore < 70)) {
+      if (db.botState.asymmetricFilterEnabled && (proposedSignal.riskRewardRatio < 1.9 || proposedSignal.confidenceScore < 65)) {
         continue;
       }
 
@@ -551,6 +557,17 @@ export class TradingEngine {
       db.portfolio.currentExposurePercent = 0;
       db.portfolio.currentDrawdownPercent = 0;
       return;
+    }
+
+    const activeAcc = db.brokerAccounts.find((a) => a.id === db.botState.activeBrokerAccountId || a.isActiveForTakeover) || db.brokerAccounts[0];
+    if (activeAcc && (db.portfolio.cashBalance < 50 || db.portfolio.totalEquity < 50)) {
+      const brokerBal = Number(activeAcc.simulatedBalance || activeAcc.balance || 5000);
+      if (brokerBal > 0) {
+        db.portfolio.cashBalance = brokerBal;
+        db.portfolio.totalEquity = brokerBal;
+        db.portfolio.peakEquity = Math.max(db.portfolio.peakEquity || 0, brokerBal);
+        db.botState.initialSeedCapital = brokerBal;
+      }
     }
 
     let totalUnrealized = 0;

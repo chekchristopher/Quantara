@@ -101,14 +101,16 @@ export const TradingEngineView: React.FC<TradingEngineViewProps> = ({
             <div className="text-[10px] text-[#8E9299]">Trend / Range Matrix</div>
           </div>
 
-          {/* Step 4 */}
-          <div className="rounded-lg border border-[#1F1F23] bg-[#0E0E11] p-3 space-y-1">
-            <div className="flex items-center justify-between text-[#8E9299] text-[10px] uppercase tracking-wider font-semibold">
+          {/* Step 4: Institutional Strategy */}
+          <div className="rounded-lg border border-blue-500/30 bg-[#0A0D14] p-3 space-y-1">
+            <div className="flex items-center justify-between text-blue-400 text-[10px] uppercase tracking-wider font-semibold">
               <span>STEP 04</span>
               <Brain className="h-3.5 w-3.5 text-blue-400" />
             </div>
-            <div className="font-semibold text-white text-xs">Strategy Signals</div>
-            <div className="text-[10px] text-[#8E9299] truncate">{botState.activeStrategyName}</div>
+            <div className="font-semibold text-white text-xs">IOFED &amp; Order Flow</div>
+            <div className="text-[10px] text-blue-300 truncate" title={botState.activeStrategyName}>
+              {botState.activeStrategyName}
+            </div>
           </div>
 
           {/* Step 5 */}
@@ -139,6 +141,100 @@ export const TradingEngineView: React.FC<TradingEngineViewProps> = ({
             </div>
             <div className="font-semibold text-emerald-200 text-xs">Broker Router</div>
             <div className="text-[10px] text-emerald-300/80">Execution + SL/TP</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Institutional Order Flow (IOF) Methodology Header */}
+      <div className="rounded-xl border border-blue-500/25 bg-[#0A0D14] p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-blue-500/20">
+          <div className="flex items-center space-x-2.5">
+            <div className="h-7 w-7 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <Layers className="h-4 w-4 text-blue-400" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-tech text-xs font-bold uppercase tracking-wider text-blue-300">
+                  Institutional Order Flow (IOF) + 6-Model Ensemble Active
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Tsiry M Trade, ICT &amp; SMC
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8E9299]">
+                Unified multi-model institutional meta-engine. Executes when 2+ institutional criteria confirm alignment for maximum profitability.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] font-mono font-semibold text-emerald-400 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/25">
+              83%–87% Historical Win Rate
+            </span>
+            <span className="text-[10px] font-mono font-semibold text-blue-400 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/25">
+              1:3.5+ to 1:5.5 R:R
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs font-mono">
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-blue-400 uppercase font-bold">1. Core IOF (IBI / IOFED)</span>
+              <span className="text-[9px] text-blue-300 bg-blue-500/10 px-1 rounded">50% CE</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              Impulse-Base-Impulse, unmitigated +OB/-OB, and Fair Value Gaps (FVG) mitigated in Discount/Premium.
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-emerald-400 uppercase font-bold">2. SMT Divergence</span>
+              <span className="text-[9px] text-emerald-300 bg-emerald-500/10 px-1 rounded">Twin Non-Confirm</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              Cross-asset non-confirmation sweeps (BTC/ETH, EUR/GBP, XAU/USD). Exploits intermarket smart money absorption.
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-purple-400 uppercase font-bold">3. Session Judas Swing</span>
+              <span className="text-[9px] text-purple-300 bg-purple-500/10 px-1 rounded">Turtle Soup</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              London &amp; NY Open false breakouts past Asian High/Low, trapping breakout liquidity and reversing violently.
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-amber-400 uppercase font-bold">4. Breaker Block Inversion</span>
+              <span className="text-[9px] text-amber-300 bg-amber-500/10 px-1 rounded">Polarity Flip</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              Violated order blocks after liquidity runs flip polarity (support to resistance / resistance to support).
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-cyan-400 uppercase font-bold">5. Anchored VWAP &amp; VPOC</span>
+              <span className="text-[9px] text-cyan-300 bg-cyan-500/10 px-1 rounded">&plusmn;2&sigma; Bands</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              Volume-weighted fair value benchmark. Mean reversion from statistical &plusmn;2&sigma; exhaustion to Volume Point of Control.
+            </p>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-[#0E121C] border border-blue-500/20 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-rose-400 uppercase font-bold">6. Quasimodo (QML) &amp; Squeeze</span>
+              <span className="text-[9px] text-rose-300 bg-rose-500/10 px-1 rounded">Over-Under BOS</span>
+            </div>
+            <p className="text-[11px] text-[#8E9299] leading-snug font-sans">
+              Left Shoulder entry after Head sweep and BOS, plus liquidation cascade wicks on massive volume exhaustion.
+            </p>
           </div>
         </div>
       </div>

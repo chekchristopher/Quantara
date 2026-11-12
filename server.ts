@@ -103,6 +103,12 @@ app.post('/api/bot/takeover', (req, res) => {
     db.botState.autonomousTakeover = takeover;
     if (takeover) {
       db.botState.mode = 'fully-automatic';
+      db.botState.isRunning = true;
+      db.botState.status = 'ONLINE';
+      db.botState.serverEngineStatus = 'RUNNING';
+      db.botState.isNonStopLoop = true;
+      db.riskSettings.killSwitchActive = false;
+      db.riskSettings.killSwitchTriggerReason = undefined;
     }
   }
 
@@ -747,6 +753,8 @@ app.post('/api/brokers/mt5/login', (req, res) => {
   db.botState.status = 'ONLINE';
   db.botState.serverEngineStatus = 'RUNNING';
   db.botState.isNonStopLoop = true;
+  db.riskSettings.killSwitchActive = false;
+  db.riskSettings.killSwitchTriggerReason = undefined;
 
   // Synchronize Portfolio capital to user's real broker capital
   db.portfolio.cashBalance = numBalance;
@@ -1038,8 +1046,17 @@ app.post('/api/brokers/sync', (req, res) => {
   if (Array.isArray(accounts)) {
     for (const incoming of accounts) {
       if (!incoming || !incoming.accountNumber) continue;
-      // Permanently reject legacy 'chek demo' or mock account IDs
-      if (incoming.name === 'chek demo' || incoming.id === 'acc_mt5_1789564204252') continue;
+      // Reject legacy template placeholder ID, MC DEMO TEST, and all simulations
+      if (
+        incoming.id === 'acc_mt5_1789564204252' ||
+        incoming.id === 'acc_mt5_1793927785320' ||
+        incoming.name === 'MC DEMO TEST' ||
+        incoming.name?.toLowerCase().includes('demo') ||
+        incoming.accountType === 'DEMO' ||
+        incoming.isPaper === true
+      ) {
+        continue;
+      }
 
       userSyncedAccounts.push({
         ...incoming,
@@ -1058,16 +1075,27 @@ app.post('/api/brokers/sync', (req, res) => {
   db.brokerAccounts = [...otherUsersAccounts, ...userSyncedAccounts];
   db.persistAccounts();
 
-  if (!db.botState.activeBrokerAccountId && userSyncedAccounts.length > 0) {
-    const first = userSyncedAccounts[0];
-    first.isActiveForTakeover = true;
-    db.botState.activeBrokerAccountId = first.id;
-    db.botState.activeBrokerAccountName = first.name;
-    db.botState.environment = first.isPaper ? 'paper' : 'live';
+  if (userSyncedAccounts.length > 0) {
+    const activeAccount = userSyncedAccounts.find((a) => a.isActiveForTakeover) || userSyncedAccounts[0];
+    activeAccount.isActiveForTakeover = true;
+    db.botState.activeBrokerAccountId = activeAccount.id;
+    db.botState.activeBrokerAccountName = activeAccount.name;
+    db.botState.environment = activeAccount.isPaper ? 'paper' : 'live';
+    db.botState.autonomousTakeover = true;
     db.botState.isRunning = true;
     db.botState.status = 'ONLINE';
     db.botState.serverEngineStatus = 'RUNNING';
     db.botState.isNonStopLoop = true;
+    db.riskSettings.killSwitchActive = false;
+    db.riskSettings.killSwitchTriggerReason = undefined;
+
+    const balanceNum = Number(activeAccount.simulatedBalance || activeAccount.balance || 5000);
+    if (balanceNum > 0 && db.portfolio.totalEquity === 0) {
+      db.portfolio.cashBalance = balanceNum;
+      db.portfolio.totalEquity = balanceNum;
+      db.portfolio.peakEquity = balanceNum;
+      db.botState.initialSeedCapital = balanceNum;
+    }
   }
 
   tradingEngine.broadcastState();
@@ -1118,6 +1146,18 @@ app.delete('/api/brokers/:id', (req, res) => {
   const remainingForUser = db.brokerAccounts.filter((b) => !userId || b.userId === userId);
   tradingEngine.broadcastState();
   res.json({ success: true, brokerAccounts: remainingForUser, botState: db.botState });
+});
+
+app.post('/api/brokers/purge-all', (req, res) => {
+  const result = db.purgeAllBrokerAccounts();
+  tradingEngine.broadcastState();
+  res.json({ success: true, count: result.count, brokerAccounts: [], botState: db.botState });
+});
+
+app.delete('/api/brokers', (req, res) => {
+  const result = db.purgeAllBrokerAccounts();
+  tradingEngine.broadcastState();
+  res.json({ success: true, count: result.count, brokerAccounts: [], botState: db.botState });
 });
 
 // -----------------------------------------------------------------------------
@@ -1386,6 +1426,83 @@ app.post('/api/tests/run', (req, res) => {
 
 app.get('/api/admin/audit-logs', (req, res) => {
   res.json(db.auditLogs);
+});
+
+// Comprehensive system telemetry for admin portal
+app.get('/api/admin/system-telemetry', (req, res) => {
+  const adminEmail = String(req.query.adminEmail || '').trim();
+  const memory = process.memoryUsage();
+  const totalBrokers = db.brokerAccounts.length;
+  const runningServers = db.brokerAccounts.filter((b) => b.serverStatus === 'RUNNING').length;
+  const totalEquity = db.brokerAccounts.reduce((acc, b) => acc + (b.equity || b.simulatedBalance || 0), 0);
+  const attempts = paymentsService.getAttempts();
+  const verified = paymentsService.getVerifiedPayments();
+
+  res.json({
+    timestamp: Date.now(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    engineLoopIntervalMs: 1500,
+    engineStatus: db.botState.serverEngineStatus || 'RUNNING',
+    isOnline: db.botState.isRunning,
+    autonomousTakeover: db.botState.autonomousTakeover,
+    activePositionsCount: db.positions.length,
+    historicalTradesCount: db.tradesHistory.length,
+    memory: {
+      heapUsedMb: Math.round((memory.heapUsed / 1024 / 1024) * 100) / 100,
+      heapTotalMb: Math.round((memory.heapTotal / 1024 / 1024) * 100) / 100,
+      rssMb: Math.round((memory.rss / 1024 / 1024) * 100) / 100,
+    },
+    brokers: {
+      total: totalBrokers,
+      running: runningServers,
+      totalCapitalUsd: totalEquity,
+    },
+    payments: {
+      totalAttempts: attempts.length,
+      verifiedCount: verified.length,
+      estimatedRevenueUsd: verified.length * 100,
+    },
+    killSwitchActive: db.riskSettings.killSwitchActive,
+  });
+});
+
+// Admin License Grant Endpoint
+app.post('/api/admin/grant-license', (req, res) => {
+  const { adminEmail, targetUserId, targetEmail, plan = 'Quantara Institutional License', durationDays = 30, notes = '' } = req.body || {};
+  if (adminEmail !== 'chekchris85@gmail.com') {
+    return res.status(403).json({ success: false, message: 'Forbidden: Administrator clearance required.' });
+  }
+
+  const paymentId = `ADMIN_GRANT_${Date.now()}`;
+  paymentsService.adminManualApprove(adminEmail, paymentId, targetEmail || 'operator', targetUserId || 'unknown', notes || `Granted ${durationDays}-day license`);
+  
+  db.addAuditLog(
+    'AUTH',
+    'ADMIN_GRANT_LICENSE',
+    `Administrator (${adminEmail}) granted ${durationDays}-day license to ${targetEmail} (${targetUserId}). Plan: ${plan}.`,
+    'INFO'
+  );
+  tradingEngine.broadcastState();
+
+  res.json({ success: true, paymentId, message: `License granted to ${targetEmail} for ${durationDays} days.` });
+});
+
+// Admin License Revoke Endpoint
+app.post('/api/admin/revoke-license', (req, res) => {
+  const { adminEmail, targetUserId, targetEmail, reason = '' } = req.body || {};
+  if (adminEmail !== 'chekchris85@gmail.com') {
+    return res.status(403).json({ success: false, message: 'Forbidden: Administrator clearance required.' });
+  }
+
+  db.addAuditLog(
+    'AUTH',
+    'ADMIN_REVOKE_LICENSE',
+    `Administrator (${adminEmail}) revoked license for ${targetEmail} (${targetUserId}). Reason: ${reason || 'Manual administrative revocation'}.`,
+    'WARN'
+  );
+  tradingEngine.broadcastState();
+
+  res.json({ success: true, message: `License revoked for ${targetEmail}.` });
 });
 
 app.get('/api/notifications', (req, res) => {

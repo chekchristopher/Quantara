@@ -48,8 +48,8 @@ export class AppDatabase {
     status: 'AWAITING_BROKER_CONNECTION',
     mode: 'fully-automatic',
     environment: 'live',
-    activeStrategyId: 'adaptive-regime',
-    activeStrategyName: 'Adaptive Regime Meta-Engine',
+    activeStrategyId: 'institutional-order-flow',
+    activeStrategyName: 'Institutional Order Flow (IOF / IBI / IOFED)',
     selectedAssets: ['XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD'],
     tradesExecutedToday: 0,
     lastTickTimestamp: Date.now(),
@@ -176,8 +176,15 @@ export class AppDatabase {
         const raw = fs.readFileSync(ACCOUNTS_STORAGE_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Permanently ignore and filter out legacy 'chek demo' or mock accounts
-          return parsed.filter((a) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
+          // Permanently ignore legacy placeholders, MC DEMO TEST, and all simulations
+          return parsed.filter((a) => a && 
+            a.id !== 'acc_mt5_1789564204252' && 
+            a.id !== 'acc_mt5_1793927785320' &&
+            a.name !== 'MC DEMO TEST' &&
+            !a.name?.toLowerCase().includes('demo') &&
+            a.accountType !== 'DEMO' &&
+            !a.isPaper
+          );
         }
       }
     } catch (err) {
@@ -191,7 +198,16 @@ export class AppDatabase {
       if (!fs.existsSync(ACCOUNTS_STORAGE_DIR)) {
         fs.mkdirSync(ACCOUNTS_STORAGE_DIR, { recursive: true });
       }
-      fs.writeFileSync(ACCOUNTS_STORAGE_FILE, JSON.stringify(this.brokerAccounts, null, 2), 'utf-8');
+      const clean = this.brokerAccounts.filter((a) => a &&
+        a.id !== 'acc_mt5_1789564204252' &&
+        a.id !== 'acc_mt5_1793927785320' &&
+        a.name !== 'MC DEMO TEST' &&
+        !a.name?.toLowerCase().includes('demo') &&
+        a.accountType !== 'DEMO' &&
+        !a.isPaper
+      );
+      this.brokerAccounts = clean;
+      fs.writeFileSync(ACCOUNTS_STORAGE_FILE, JSON.stringify(clean, null, 2), 'utf-8');
     } catch (err) {
       console.error('Failed to write accounts to storage file:', err);
     }
@@ -238,10 +254,10 @@ export class AppDatabase {
 
   public purgeMockData(): void {
     // Scrub all mock and demo artifacts
-    this.brokerAccounts = this.brokerAccounts.filter((a) => a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252');
-    this.positions = this.positions.filter((p) => p.serverName !== 'chek demo' && p.serverId !== 'acc_mt5_1789564204252');
-    this.orders = this.orders.filter((o) => o.serverName !== 'chek demo' && o.serverId !== 'acc_mt5_1789564204252');
-    this.tradesHistory = this.tradesHistory.filter((t) => t.accountName !== 'chek demo' && t.serverName !== 'chek demo' && t.serverId !== 'acc_mt5_1789564204252');
+    this.brokerAccounts = this.brokerAccounts.filter((a) => a.id !== 'acc_mt5_1789564204252');
+    this.positions = this.positions.filter((p) => p.serverId !== 'acc_mt5_1789564204252');
+    this.orders = this.orders.filter((o) => o.serverId !== 'acc_mt5_1789564204252');
+    this.tradesHistory = this.tradesHistory.filter((t) => t.serverId !== 'acc_mt5_1789564204252');
 
     if (this.brokerAccounts.length === 0) {
       this.portfolio = {
@@ -275,6 +291,57 @@ export class AppDatabase {
     this.persistEngineState();
   }
 
+  public purgeAllBrokerAccounts(): { count: number } {
+    const count = this.brokerAccounts.length;
+    this.brokerAccounts = [];
+    this.positions = [];
+    this.orders = [];
+    this.portfolio = {
+      totalEquity: 0,
+      cashBalance: 0,
+      unrealizedPnl: 0,
+      realizedPnlToday: 0,
+      totalRealizedPnl: 0,
+      todayPnlPercent: 0,
+      totalReturnPercent: 0,
+      maxDrawdownPercent: 0,
+      currentDrawdownPercent: 0,
+      winRatePercent: 0,
+      profitFactor: 0,
+      totalTradesExecuted: 0,
+      activePositionsCount: 0,
+      currentExposureUsd: 0,
+      currentExposurePercent: 0,
+      peakEquity: 0,
+      realizedPnlTodayHistory: [],
+    };
+    this.botState.activeBrokerAccountId = undefined;
+    this.botState.activeBrokerAccountName = undefined;
+    this.botState.isRunning = false;
+    this.botState.status = 'AWAITING_BROKER_CONNECTION';
+    this.botState.serverEngineStatus = 'STOPPED';
+    this.botState.isNonStopLoop = false;
+    this.offlineSessionStats = undefined;
+
+    this.persistAccounts();
+    this.persistEngineState();
+
+    this.addAuditLog(
+      'BROKER',
+      'ALL_BROKERS_PERMANENTLY_PURGED',
+      `Permanently deleted every connected broker account (${count} removed) from system database and persistent disk storage.`,
+      'WARN'
+    );
+    this.addNotification(
+      'SYSTEM',
+      'All Brokers Deleted',
+      `All ${count} connected broker accounts, positions, and orders permanently removed from database.`,
+      'warning'
+    );
+
+    return { count };
+  }
+
   private initializeEngineState(): void {
     try {
       if (fs.existsSync(ENGINE_STATE_FILE)) {
@@ -284,9 +351,19 @@ export class AppDatabase {
           if (state.portfolio && typeof state.portfolio.totalEquity === 'number') {
             this.portfolio = { ...this.portfolio, ...state.portfolio };
           }
+          const activeAcc = this.brokerAccounts.find((a) => a.id === state?.botState?.activeBrokerAccountId || a.isActiveForTakeover) || this.brokerAccounts[0];
+          if (activeAcc) {
+            const accBal = Number(activeAcc.simulatedBalance || activeAcc.balance || 5000);
+            if (accBal > 0 && (this.portfolio.cashBalance < 50 || this.portfolio.totalEquity < 50)) {
+              this.portfolio.cashBalance = accBal;
+              this.portfolio.totalEquity = accBal;
+              this.portfolio.peakEquity = Math.max(this.portfolio.peakEquity || 0, accBal);
+              this.botState.initialSeedCapital = accBal;
+            }
+          }
           if (Array.isArray(state.positions)) {
             this.positions = state.positions
-              .filter((p: any) => p.serverName !== 'chek demo' && p.serverId !== 'acc_mt5_1789564204252')
+              .filter((p: any) => p.serverId !== 'acc_mt5_1789564204252')
               .map((p: any) => ({
                 ...p,
                 lotSize: typeof p.lotSize === 'number' && p.lotSize > 0
@@ -295,11 +372,11 @@ export class AppDatabase {
               }));
           }
           if (Array.isArray(state.orders)) {
-            this.orders = state.orders.filter((o: any) => o.serverName !== 'chek demo' && o.serverId !== 'acc_mt5_1789564204252');
+            this.orders = state.orders.filter((o: any) => o.serverId !== 'acc_mt5_1789564204252');
           }
           if (Array.isArray(state.tradesHistory)) {
             this.tradesHistory = state.tradesHistory
-              .filter((t: any) => t.accountName !== 'chek demo' && t.serverName !== 'chek demo' && t.serverId !== 'acc_mt5_1789564204252')
+              .filter((t: any) => t.serverId !== 'acc_mt5_1789564204252')
               .map((t: any) => ({
                 ...t,
                 lotSize: typeof t.lotSize === 'number' && t.lotSize > 0

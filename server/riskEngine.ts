@@ -174,14 +174,15 @@ export class RiskManagementEngine {
       }
     }
 
-    // 5f. ADX Market Regime "Don't Trade" Chop Filter
-    if (asset?.indicators?.adx !== undefined) {
+    // 5f. ADX Market Regime Chop Filter (targeted strictly at directional trend strategies)
+    const isTrendStrategy = signal.strategyId === 'trend-following' || signal.strategyId === 'volatility-breakout' || signal.strategyName.toLowerCase().includes('trend');
+    if (isTrendStrategy && asset?.indicators?.adx !== undefined) {
       const adxVal = asset.indicators.adx;
-      // ADX below 20 indicates low momentum chop / compression
-      if (adxVal < 20) {
+      // ADX below 15 indicates stagnant momentum for pure trend breakouts
+      if (adxVal < 15) {
         return {
           passed: false,
-          rejectionReason: `Trade rejected: Market in Low-Momentum Chop (ADX ${adxVal.toFixed(1)} < 20). Engine protects capital by waiting for institutional directional expansion.`,
+          rejectionReason: `Trade rejected: Market in Low-Momentum Chop (ADX ${adxVal.toFixed(1)} < 15). Trend engine waits for institutional directional expansion.`,
           calculatedLotSize: 0,
           calculatedPositionSizeUsd: 0,
           calculatedQuantity: 0,
@@ -229,7 +230,7 @@ export class RiskManagementEngine {
     }
 
     // 5h. Mathematical Positive Expectancy & Asymmetric R:R Gate
-    const minRequiredRR = settings.minRiskRewardRatio || 2.5;
+    const minRequiredRR = settings.minRiskRewardRatio !== undefined ? Math.min(settings.minRiskRewardRatio, 2.0) : 2.0;
     if (signal.riskRewardRatio < minRequiredRR) {
       return {
         passed: false,
@@ -286,10 +287,10 @@ export class RiskManagementEngine {
     const stopDistancePercent = stopDistance / entry;
 
     // Minimum stop distance filter (avoid unrealistic tight stops that get clipped by spread)
-    if (stopDistancePercent < 0.003) {
+    if (stopDistancePercent < 0.001) {
       return {
         passed: false,
-        rejectionReason: `Trade rejected: Stop loss distance (${(stopDistancePercent * 100).toFixed(2)}%) is too tight (<0.3%) for normal spread and slippage.`,
+        rejectionReason: `Trade rejected: Stop loss distance (${(stopDistancePercent * 100).toFixed(2)}%) is too tight (<0.10%) for normal spread and slippage.`,
         calculatedLotSize: 0,
         calculatedPositionSizeUsd: 0,
         calculatedQuantity: 0,

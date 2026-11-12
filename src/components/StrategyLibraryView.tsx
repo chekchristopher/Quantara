@@ -94,7 +94,7 @@ export const StrategyLibraryView: React.FC<StrategyLibraryViewProps> = ({
               <div>
                 <span className="text-[10px] text-[#8E9299] uppercase tracking-wider block mb-1.5 font-semibold">Optimized For Regimes:</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {strat.regimes.map((reg) => (
+                  {(strat.regimes || strat.idealMarketRegimes || []).map((reg) => (
                     <span
                       key={reg}
                       className="rounded bg-[#1F1F23] px-2 py-0.5 text-[10px] text-[#E4E4E7] border border-[#2E2E33]"

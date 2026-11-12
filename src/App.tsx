@@ -85,8 +85,8 @@ function QuantaraApp() {
     status: 'AWAITING_BROKER_CONNECTION',
     mode: 'fully-automatic',
     environment: 'live',
-    activeStrategyId: 'adaptive-regime',
-    activeStrategyName: 'Adaptive Regime Meta-Engine',
+    activeStrategyId: 'institutional-order-flow',
+    activeStrategyName: 'Institutional Order Flow (IOF / IBI / IOFED)',
     selectedAssets: ['XAU/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'BTC/USD'],
     tradesExecutedToday: 0,
     lastTickTimestamp: Date.now(),
@@ -240,8 +240,21 @@ function QuantaraApp() {
 
     // Real-time broker profiles subscription from Firestore (strictly scoped to user.uid)
     const unsubBrokers = firestoreSync.subscribeBrokers(user.uid, (cloudBrokers) => {
-      // Ensure only this user's accounts are ever set in state
-      const verifiedBrokers = (cloudBrokers || []).filter((b) => !b.userId || b.userId === user.uid);
+      // Ensure only real, non-demo accounts belonging to this user are allowed
+      const verifiedBrokers = (cloudBrokers || []).filter((b) => {
+        if (!b) return false;
+        const isDemo = b.name === 'MC DEMO TEST' ||
+          b.name?.toLowerCase().includes('demo') ||
+          b.id === 'acc_mt5_1793927785320' ||
+          b.id === 'acc_mt5_1789564204252' ||
+          b.accountType === 'DEMO' ||
+          b.isPaper === true;
+        if (isDemo && user.uid) {
+          firestoreSync.deleteBrokerProfile(user.uid, b.id).catch(console.warn);
+          return false;
+        }
+        return (!b.userId || b.userId === user.uid);
+      });
       setBrokerAccounts(verifiedBrokers);
       // Sync strictly for this user on the server
       api.syncBrokerAccounts(verifiedBrokers, user.uid, user.email || undefined).catch(console.warn);
@@ -270,6 +283,15 @@ function QuantaraApp() {
       localStorage.removeItem('quantara_connected_accounts_v2');
     } catch (e) {}
 
+    // Check if initial purge requested or execute automatic purge of demo brokers
+    try {
+      if (user?.uid) {
+        // Purge specific stale demo records from Firestore
+        firestoreSync.deleteBrokerProfile(user.uid, 'acc_mt5_1793927785320').catch(console.warn);
+        firestoreSync.deleteBrokerProfile(user.uid, 'acc_mt5_1789564204252').catch(console.warn);
+      }
+    } catch (e) {}
+
     if (!user?.uid) {
       setBrokerAccounts([]);
       return;
@@ -281,14 +303,27 @@ function QuantaraApp() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           const cleanAccounts = parsed.filter(
-            (a: any) => a && a.name !== 'chek demo' && a.id !== 'acc_mt5_1789564204252' && (!a.userId || a.userId === user.uid)
+            (a: any) =>
+              a &&
+              a.id !== 'acc_mt5_1789564204252' &&
+              a.id !== 'acc_mt5_1793927785320' &&
+              a.name !== 'MC DEMO TEST' &&
+              !a.name?.toLowerCase().includes('demo') &&
+              a.accountType !== 'DEMO' &&
+              !a.isPaper &&
+              (!a.userId || a.userId === user.uid)
           );
+          if (cleanAccounts.length !== parsed.length) {
+            localStorage.setItem(`quantara_connected_accounts_${user.uid}`, JSON.stringify(cleanAccounts));
+          }
           if (cleanAccounts.length > 0) {
             setBrokerAccounts(cleanAccounts);
             api.syncBrokerAccounts(cleanAccounts, user.uid, user.email || undefined).then((res) => {
               if (res?.accounts) setBrokerAccounts(res.accounts);
               if (res?.botState) setBotState(res.botState);
             }).catch(console.warn);
+          } else {
+            setBrokerAccounts([]);
           }
         }
       }
@@ -518,6 +553,33 @@ function QuantaraApp() {
         details: { brokerId: id },
         severity: 'WARN',
       }).catch(console.warn);
+    }
+    return res;
+  };
+
+  const handlePurgeAllBrokers = async () => {
+    const res = await api.purgeAllBrokers();
+    setBrokerAccounts([]);
+    setPositions([]);
+    setOrders([]);
+    if (res?.botState) setBotState(res.botState);
+    try {
+      localStorage.removeItem('quantara_connected_accounts_v2');
+      if (user?.uid) {
+        localStorage.removeItem(`quantara_connected_accounts_${user.uid}`);
+        await firestoreSync.deleteAllUserBrokers(user.uid);
+        if (user.email === 'chekchris85@gmail.com') {
+          await firestoreSync.adminPurgeAllBrokers();
+        }
+        await firestoreSync.appendAuditLog(user.uid, {
+          action: 'PURGE_ALL_BROKERS',
+          category: 'BROKER',
+          details: { message: 'Permanently deleted all connected brokers from database.' },
+          severity: 'WARN',
+        });
+      }
+    } catch (e) {
+      console.warn('Storage/Firestore purge warning:', e);
     }
     return res;
   };
@@ -807,6 +869,7 @@ function QuantaraApp() {
             onPauseAllServers={handlePauseAllServers}
             onRunAllServers={handleRunAllServers}
             onNavigateTab={setCurrentTab}
+            onPurgeAllBrokers={handlePurgeAllBrokers}
           />
         )}
 
@@ -840,6 +903,9 @@ function QuantaraApp() {
               auditLogs={auditLogs}
               botState={botState}
               portfolio={portfolio}
+              isDark={isDark}
+              currentUser={user}
+              onPurgeAllBrokers={handlePurgeAllBrokers}
             />
           ) : (
             <div className="max-w-2xl mx-auto my-16 p-8 rounded-2xl border border-red-500/30 bg-[#0E0E12] text-center space-y-4 font-mono shadow-2xl">

@@ -16,12 +16,27 @@
     "currentExposureUsd": 0,
     "currentExposurePercent": 0,
     "peakEquity": 0,
-    "realizedPnlTodayHistory": []
+    "realizedPnlTodayHistory": [
+      {
+        "time": "03:50 AM",
+        "timestamp": 1794455429235,
+        "realizedPnlToday": 0,
+        "delta": 0,
+        "symbol": "Session Open"
+      },
+      {
+        "time": "07:50 AM",
+        "timestamp": 1794469829292,
+        "realizedPnlToday": 0,
+        "delta": 0
+      }
+    ]
   },
   "positions": [],
   "orders": [],
   "tradesHistory": [],
   "riskSettings": {
+    "activeRiskProfile": "BALANCED",
     "maxRiskPerTradePercent": 1.5,
     "maxDailyLossPercent": 3.5,
     "maxWeeklyLossPercent": 7.5,
@@ -31,11 +46,17 @@
     "maxPortfolioExposurePercent": 75,
     "maxLeverage": 3,
     "defaultStopLossAtrMultiplier": 1.5,
-    "defaultTakeProfitRiskReward": 2.2,
+    "defaultTakeProfitRiskReward": 2.4,
+    "minRiskRewardRatio": 2,
+    "breakevenTriggerR": 1,
+    "partialTakeProfitR": 1.8,
+    "partialTakeProfitPercent": 50,
+    "newsBlackoutActive": false,
+    "newsBlackoutMinutes": 15,
+    "hardCapitalFloorPercent": 85,
     "trailingStopEnabled": true,
     "trailingStopPercent": 1.8,
-    "killSwitchActive": true,
-    "killSwitchTriggerReason": "Emergency Stop Activated via Operator HUD",
+    "killSwitchActive": false,
     "closePositionsOnKillSwitch": true
   },
   "botState": {
@@ -43,8 +64,8 @@
     "status": "AWAITING_BROKER_CONNECTION",
     "mode": "fully-automatic",
     "environment": "live",
-    "activeStrategyId": "adaptive-regime",
-    "activeStrategyName": "Adaptive Regime Meta-Engine",
+    "activeStrategyId": "institutional-order-flow",
+    "activeStrategyName": "Institutional Order Flow (IOF / IBI / IOFED)",
     "selectedAssets": [
       "XAU/USD",
       "EUR/USD",
@@ -52,14 +73,14 @@
       "USD/JPY",
       "BTC/USD"
     ],
-    "tradesExecutedToday": 10,
+    "tradesExecutedToday": 4,
     "autonomousTakeover": true,
     "compoundingMode": "micro-wealth-accelerator",
-    "initialSeedCapital": 0,
+    "initialSeedCapital": 10,
     "microAccountTarget": 10000,
     "asymmetricFilterEnabled": true,
     "serverEngineStatus": "STOPPED",
-    "serverUptimeSeconds": 8550,
+    "serverUptimeSeconds": 9690,
     "isNonStopLoop": false
   }
 }

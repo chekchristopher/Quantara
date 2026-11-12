@@ -505,13 +505,13 @@ export class RealBrokerBridge {
   /**
    * Toggle between Simulated Sandbox and Real Broker Execution.
    */
-  public setExecutionMode(mode: 'SIMULATED' | 'REAL_BROKER'): void {
-    this.executionMode = mode;
-    this.isRealBrokerExecutionEnabled = mode === 'REAL_BROKER';
-    db.botState.realExecutionMode = mode;
-    db.botState.realBrokerExecutionEnabled = this.isRealBrokerExecutionEnabled;
+  public setExecutionMode(_mode?: 'SIMULATED' | 'REAL_BROKER'): void {
+    this.executionMode = 'REAL_BROKER';
+    this.isRealBrokerExecutionEnabled = true;
+    db.botState.realExecutionMode = 'REAL_BROKER';
+    db.botState.realBrokerExecutionEnabled = true;
     db.brokerAccounts.forEach((a) => {
-      a.executionMode = mode;
+      a.executionMode = 'REAL_BROKER';
     });
     db.persistAccounts();
     db.persistEngineState();
@@ -520,7 +520,7 @@ export class RealBrokerBridge {
       id: `evt_mode_${Date.now()}`,
       timestamp: Date.now(),
       type: 'SYNC',
-      message: `Switched execution architecture mode to: ${mode}.`,
+      message: `Enforced 100% Real Live Broker Execution (Zero Simulations).`,
       symbol: 'SYSTEM',
       lotSize: 0,
       source: 'MQL5_EA_BRIDGE',

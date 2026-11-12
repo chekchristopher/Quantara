@@ -116,6 +116,7 @@ export interface StrategyConfig {
   description: string;
   enabled: boolean;
   idealMarketRegimes: MarketRegimeType[];
+  regimes?: MarketRegimeType[];
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
   parameters: Record<string, number | string | boolean>;
   historicalStats: {
@@ -476,6 +477,7 @@ export interface BrokerAccount {
   status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'TESTNET_ACTIVE';
   permissions: string[];
   simulatedBalance: number;
+  balance?: number;
   equity?: number;
   freeMargin?: number;
   marginLevel?: number;
@@ -728,8 +730,8 @@ export interface PaymentRecord {
   amount: number;
   currency: string;
   plan: string;
-  paymentProvider: 'NOWPayments';
-  invoiceId: string;
+  paymentProvider: 'NOWPayments' | 'ADMIN_CLEARANCE' | 'MANUAL_APPROVAL';
+  invoiceId?: string;
   transactionRef: string;
   status: 'CONFIRMED' | 'PENDING' | 'FAILED' | 'EXPIRED';
   timestamp: string;

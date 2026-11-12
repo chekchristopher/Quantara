@@ -35,7 +35,7 @@ interface BacktestingViewProps {
 export const BacktestingView: React.FC<BacktestingViewProps> = ({ strategies, onRunBacktest }) => {
   const { isDark } = useTheme();
   const [symbol, setSymbol] = useState('BTC/USD');
-  const [strategyId, setStrategyId] = useState('adaptive-regime');
+  const [strategyId, setStrategyId] = useState('institutional-order-flow');
   const [timeframe, setTimeframe] = useState<'1m' | '15m' | '1h'>('1h');
   const [days, setDays] = useState(60);
   const [startingCapital, setStartingCapital] = useState(25000);

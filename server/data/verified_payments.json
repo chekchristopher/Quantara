@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "paymentId": "ADMIN_GRANT_1794328581366",
+    "invoiceId": "5836437268",
+    "paymentStatus": "finished",
+    "priceAmount": 100,
+    "actuallyPaid": 100,
+    "payCurrency": "CRYPTO_MANUAL_VERIFIED",
+    "createdAt": "2026-11-10T16:36:21.366Z",
+    "confirmedAt": "2026-11-10T16:36:21.366Z",
+    "claimedByEmail": "test@operator.com",
+    "claimedByUid": "test_uid",
+    "claimedAt": "2026-11-10T16:36:21.366Z",
+    "verifiedVia": "ADMIN_APPROVAL",
+    "txHash": "ADMIN_GRANT_1794328581366",
+    "rawPayload": {
+      "manualApprovalBy": "chekchris85@gmail.com",
+      "notes": "Self-test"
+    }
+  }
+]

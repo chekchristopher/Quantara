@@ -257,14 +257,8 @@ export const QuickLaunchWizard: React.FC<QuickLaunchWizardProps> = ({
                           {connectedBroker.server || 'MetaQuotes / Live Bridge'}
                         </span>
                       </div>
-                      <span
-                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${
-                          connectedBroker.accountType === 'DEMO' || connectedBroker.isPaper
-                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                            : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        }`}
-                      >
-                        {connectedBroker.accountType === 'DEMO' || connectedBroker.isPaper ? 'DEMO' : 'REAL LIVE'}
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                        REAL LIVE
                       </span>
                     </div>
                     <div className="p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-300 flex items-center justify-between">

@@ -336,6 +336,11 @@ export const api = {
     return res.json();
   },
 
+  async purgeAllBrokers(): Promise<{ success: boolean; count: number; brokerAccounts: BrokerAccount[]; botState: any }> {
+    const res = await fetch('/api/brokers/purge-all', { method: 'POST' });
+    return res.json();
+  },
+
   async selectActiveBroker(accountId: string, userId?: string): Promise<{ success: boolean; activeAccount: BrokerAccount; botState: BotState }> {
     const res = await fetch('/api/brokers/select-active', {
       method: 'POST',
@@ -393,6 +398,42 @@ export const api = {
   // Admin & User
   async getAuditLogs(): Promise<AuditLog[]> {
     const res = await fetch('/api/admin/audit-logs');
+    return res.json();
+  },
+
+  async getAdminTelemetry(adminEmail?: string): Promise<any> {
+    const url = adminEmail ? `/api/admin/system-telemetry?adminEmail=${encodeURIComponent(adminEmail)}` : '/api/admin/system-telemetry';
+    const res = await fetch(url);
+    return res.json();
+  },
+
+  async adminGrantLicense(payload: {
+    adminEmail: string;
+    targetUserId: string;
+    targetEmail: string;
+    plan?: string;
+    durationDays?: number;
+    notes?: string;
+  }): Promise<{ success: boolean; paymentId?: string; message: string }> {
+    const res = await fetch('/api/admin/grant-license', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+
+  async adminRevokeLicense(payload: {
+    adminEmail: string;
+    targetUserId: string;
+    targetEmail: string;
+    reason?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/admin/revoke-license', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     return res.json();
   },
 
